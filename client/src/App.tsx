@@ -9,6 +9,7 @@ import Dashboard from "@/pages/dashboard";
 import SchedulePost from "@/pages/schedule-post";
 import Posts from "@/pages/posts";
 import Analytics from "@/pages/analytics";
+import SocialAccounts from "@/pages/social-accounts";
 import Navigation from "@/components/layout/navigation";
 import { initDemoAuth } from "./lib/auth";
 
@@ -22,6 +23,7 @@ function Router() {
           <Route path="/schedule" component={SchedulePost} />
           <Route path="/posts" component={Posts} />
           <Route path="/analytics" component={Analytics} />
+          <Route path="/accounts" component={SocialAccounts} />
           <Route component={NotFound} />
         </Switch>
       </main>

@@ -10,6 +10,11 @@ export class SocialMediaService {
     try {
       const client = this.getTwitterClient(account);
       
+      // Validate content length for Twitter
+      if (post.content.length > 280) {
+        throw new Error('Tweet content exceeds 280 character limit');
+      }
+
       let tweetData: any = {
         text: post.content
       };
@@ -25,6 +30,7 @@ export class SocialMediaService {
       const tweet = await client.v2.tweet(tweetData);
       return tweet.data.id;
     } catch (error) {
+      console.error('Twitter posting error:', error);
       throw new Error(`Twitter posting failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

@@ -23,6 +23,7 @@ export default function Navigation() {
     { href: "/schedule", label: "Schedule", icon: Calendar },
     { href: "/posts", label: "Posts", icon: FileText },
     { href: "/analytics", label: "Analytics", icon: TrendingUp },
+    { href: "/accounts", label: "Accounts", icon: Settings },
   ];
 
   return (
