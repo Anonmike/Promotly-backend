@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { z } from "zod";
 import { storage } from "./storage";
 import { insertUserSchema, insertSocialAccountSchema, insertPostSchema, platformSchema, postStatusSchema } from "@shared/schema";
 import bcrypt from "bcrypt";
@@ -131,21 +132,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/posts/schedule", authenticateToken, async (req: any, res) => {
     try {
+      console.log('Received post data:', req.body);
+      
       const postData = insertPostSchema.parse({
         ...req.body,
         userId: req.user.userId,
         status: "scheduled"
       });
 
+      console.log('Parsed post data:', postData);
+
       // Validate platforms
-      for (const platform of postData.platforms) {
-        platformSchema.parse(platform);
+      if (postData.platforms && postData.platforms.length > 0) {
+        for (const platform of postData.platforms) {
+          platformSchema.parse(platform);
+        }
       }
 
       const post = await storage.createPost(postData);
       res.json({ post });
     } catch (error) {
-      res.status(400).json({ message: "Invalid post data" });
+      console.error('Post scheduling error:', error);
+      if (error instanceof z.ZodError) {
+        console.error('Zod validation errors:', error.errors);
+        return res.status(400).json({ 
+          message: "Invalid post data", 
+          errors: error.errors,
+          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        });
+      }
+      res.status(500).json({ 
+        message: "Failed to schedule post",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

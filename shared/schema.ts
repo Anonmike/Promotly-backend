@@ -72,6 +72,10 @@ export const insertPostSchema = createInsertSchema(posts).pick({
   mediaUrls: true,
   scheduledFor: true,
   status: true,
+}).extend({
+  scheduledFor: z.coerce.date(),
+  platforms: z.array(z.string()).min(1, "At least one platform is required"),
+  mediaUrls: z.array(z.string()).optional().default([]),
 });
 
 export const insertAnalyticsSchema = createInsertSchema(analytics).pick({
