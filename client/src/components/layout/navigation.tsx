@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +9,14 @@ import {
   TrendingUp, 
   Share2,
   Settings,
-  Bell
+  Bell,
+  Menu,
+  X
 } from "lucide-react";
 
 export default function Navigation() {
   const [location] = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: Home },
@@ -61,7 +65,7 @@ export default function Navigation() {
 
           {/* Right Side Actions */}
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" className="relative">
+            <Button variant="ghost" size="sm" className="relative" onClick={() => alert('Notifications feature coming soon!')}>
               <Bell className="h-5 w-5" />
               <Badge 
                 variant="destructive" 
@@ -71,7 +75,7 @@ export default function Navigation() {
               </Badge>
             </Button>
             
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={() => alert('Settings feature coming soon!')}>
               <Settings className="h-5 w-5" />
             </Button>
 
@@ -83,40 +87,49 @@ export default function Navigation() {
 
           {/* Mobile Navigation */}
           <div className="md:hidden">
-            <Button variant="ghost" size="sm">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
             </Button>
           </div>
         </div>
 
         {/* Mobile Navigation Menu */}
-        <div className="md:hidden border-t border-gray-200 py-2">
-          <div className="grid grid-cols-4 gap-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location === item.href;
-              
-              return (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "default" : "ghost"}
-                    size="sm"
-                    className={`w-full flex flex-col items-center space-y-1 h-auto py-2 ${
-                      isActive 
-                        ? "bg-blue-600 text-white hover:bg-blue-700" 
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-xs">{item.label}</span>
-                  </Button>
-                </Link>
-              );
-            })}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-200 py-2 animate-fade-in">
+            <div className="grid grid-cols-4 gap-2">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location === item.href;
+                
+                return (
+                  <Link key={item.href} href={item.href}>
+                    <Button
+                      variant={isActive ? "default" : "ghost"}
+                      size="sm"
+                      className={`w-full flex flex-col items-center space-y-1 h-auto py-2 ${
+                        isActive 
+                          ? "bg-blue-600 text-white hover:bg-blue-700" 
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="text-xs">{item.label}</span>
+                    </Button>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </nav>
   );

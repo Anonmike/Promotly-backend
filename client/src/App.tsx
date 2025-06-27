@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -9,6 +10,7 @@ import SchedulePost from "@/pages/schedule-post";
 import Posts from "@/pages/posts";
 import Analytics from "@/pages/analytics";
 import Navigation from "@/components/layout/navigation";
+import { initDemoAuth } from "./lib/auth";
 
 function Router() {
   return (
@@ -28,6 +30,15 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    // Initialize demo authentication on app start
+    initDemoAuth().then(() => {
+      console.log('Demo authentication initialized');
+    }).catch(error => {
+      console.error('Demo auth failed:', error);
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

@@ -83,6 +83,8 @@ export class MemStorage implements IStorage {
       id,
       isActive: true,
       createdAt: new Date(),
+      refreshToken: insertAccount.refreshToken || null,
+      expiresAt: insertAccount.expiresAt || null,
     };
     this.socialAccounts.set(id, account);
     return account;
@@ -130,9 +132,13 @@ export class MemStorage implements IStorage {
   async createPost(insertPost: InsertPost): Promise<Post> {
     const id = this.currentPostId++;
     const post: Post = {
-      ...insertPost,
       id,
-      mediaUrls: insertPost.mediaUrls || [],
+      userId: insertPost.userId,
+      content: insertPost.content,
+      platforms: (insertPost.platforms || []) as string[],
+      mediaUrls: (insertPost.mediaUrls || []) as string[],
+      scheduledFor: insertPost.scheduledFor,
+      status: insertPost.status || "draft",
       publishedAt: null,
       errorMessage: null,
       socialPostIds: {},
@@ -173,6 +179,12 @@ export class MemStorage implements IStorage {
     const analytics: Analytics = {
       ...insertAnalytics,
       id,
+      comments: insertAnalytics.comments || null,
+      likes: insertAnalytics.likes || null,
+      shares: insertAnalytics.shares || null,
+      clicks: insertAnalytics.clicks || null,
+      impressions: insertAnalytics.impressions || null,
+      engagementRate: insertAnalytics.engagementRate || null,
       lastUpdated: new Date(),
     };
     this.analytics.set(id, analytics);
@@ -213,7 +225,7 @@ export class MemStorage implements IStorage {
           break;
       }
 
-      analytics = analytics.filter(a => new Date(a.lastUpdated) >= cutoffDate);
+      analytics = analytics.filter(a => a.lastUpdated && new Date(a.lastUpdated) >= cutoffDate);
     }
 
     return analytics;
