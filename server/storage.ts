@@ -4,6 +4,7 @@ export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByClerkId(clerkUserId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
   // Social account operations
@@ -58,9 +59,18 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).find(user => user.username === username);
   }
 
+  async getUserByClerkId(clerkUserId: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.clerkUserId === clerkUserId);
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
+    const user: User = { 
+      id,
+      username: insertUser.username,
+      password: insertUser.password || null,
+      clerkUserId: insertUser.clerkUserId || null
+    };
     this.users.set(id, user);
     return user;
   }

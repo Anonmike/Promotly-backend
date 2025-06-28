@@ -1,6 +1,6 @@
 import { SignIn, SignUp, SignedIn, SignedOut, UserButton, useAuth } from "@clerk/clerk-react";
 import { Switch, Route } from "wouter";
-import { queryClient, setClerkToken } from "./lib/queryClient";
+import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -79,32 +79,59 @@ function Router() {
 }
 
 function AuthenticatedApp() {
-  const { getToken } = useAuth();
+  const { userId } = useAuth();
+  const [isJWTReady, setIsJWTReady] = useState(false);
 
   useEffect(() => {
-    const updateToken = async () => {
+    const setupJWTAuth = async () => {
       try {
-        const token = await getToken();
-        console.log('Clerk token obtained:', token ? 'Token present' : 'No token');
-        if (token) {
-          console.log('Setting token in query client');
-          setClerkToken(token);
-        } else {
-          console.log('No token available');
-          setClerkToken(null);
+        if (userId) {
+          // Complete Clerk authentication and get JWT token
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: `user_${userId}` }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem('social_scheduler_token', data.token);
+            localStorage.setItem('social_scheduler_user', JSON.stringify(data.user));
+            setIsJWTReady(true);
+          } else {
+            // Try login if register fails
+            const loginResponse = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({}),
+            });
+            
+            if (loginResponse.ok) {
+              const data = await loginResponse.json();
+              localStorage.setItem('social_scheduler_token', data.token);
+              localStorage.setItem('social_scheduler_user', JSON.stringify(data.user));
+              setIsJWTReady(true);
+            }
+          }
         }
       } catch (error) {
-        console.error('Failed to get Clerk token:', error);
-        setClerkToken(null);
+        console.error('JWT setup failed:', error);
       }
     };
 
-    updateToken();
-    // Update token periodically
-    const interval = setInterval(updateToken, 5 * 60 * 1000); // Every 5 minutes
+    setupJWTAuth();
+  }, [userId]);
 
-    return () => clearInterval(interval);
-  }, [getToken]);
+  if (!isJWTReady) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Setting up your account...</p>
+        </div>
+      </div>
+    );
+  }
 
   return <Router />;
 }

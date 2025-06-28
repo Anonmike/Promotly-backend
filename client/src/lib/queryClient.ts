@@ -7,12 +7,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// Global auth token storage for Clerk
-let clerkToken: string | null = null;
-
-export function setClerkToken(token: string | null) {
-  clerkToken = token;
-}
+import { authService } from "./auth";
 
 export async function apiRequest(
   method: string,
@@ -23,11 +18,10 @@ export async function apiRequest(
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  if (clerkToken) {
-    headers["Authorization"] = `Bearer ${clerkToken}`;
-    console.log('API request with token to:', url);
-  } else {
-    console.log('API request WITHOUT token to:', url);
+  
+  const token = authService.getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const res = await fetch(url, {
@@ -48,11 +42,9 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const headers: Record<string, string> = {};
-    if (clerkToken) {
-      headers["Authorization"] = `Bearer ${clerkToken}`;
-      console.log('Query with token to:', queryKey[0]);
-    } else {
-      console.log('Query WITHOUT token to:', queryKey[0]);
+    const token = authService.getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
     
     const res = await fetch(queryKey[0] as string, {

@@ -104,3 +104,4 @@ Changelog:
 - June 28, 2025. Added comprehensive social media posting support across multiple platforms
 - June 28, 2025. Enhanced platform selector to show connection status and dynamic availability
 - June 28, 2025. Migrated from JWT authentication to Clerk authentication system for robust user management
+- June 28, 2025. Implemented hybrid authentication: Clerk for user sign in/sign up, JWT for all API endpoints to restore scheduling functionality

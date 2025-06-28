@@ -5,20 +5,69 @@ import { storage } from "./storage";
 import { insertSocialAccountSchema, insertPostSchema, platformSchema, postStatusSchema } from "@shared/schema";
 import { socialMediaService } from "./services/social-media";
 import { scheduler } from "./services/scheduler";
-import { clerkAuth, requireAuth, getUserId } from "./middleware/clerk-auth";
+import { clerkAuth, requireAuth as requireClerkAuth, getUserId } from "./middleware/clerk-auth";
+import { verifyJWT, generateJWT, getJWTUser } from "./middleware/jwt-auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Apply Clerk auth middleware globally
-  app.use(clerkAuth);
-
-  // Social account routes
-  app.get("/api/social-accounts", requireAuth, async (req, res) => {
+  // Clerk authentication routes (sign in/sign up only)
+  app.post("/api/auth/register", clerkAuth, requireClerkAuth, async (req, res) => {
     try {
-      const userId = getUserId(req);
-      if (!userId) {
+      const clerkUserId = getUserId(req);
+      if (!clerkUserId) {
+        return res.status(401).json({ message: "Clerk authentication required" });
+      }
+      
+      const { username } = req.body;
+      if (!username) {
+        return res.status(400).json({ message: "Username is required" });
+      }
+
+      // Create user in our storage with Clerk ID as reference
+      const user = await storage.createUser({ 
+        username, 
+        clerkUserId: clerkUserId 
+      });
+      
+      // Generate JWT for API access
+      const token = generateJWT({ id: user.id, username: user.username });
+      
+      res.json({ user, token });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to register user" });
+    }
+  });
+
+  app.post("/api/auth/login", clerkAuth, requireClerkAuth, async (req, res) => {
+    try {
+      const clerkUserId = getUserId(req);
+      if (!clerkUserId) {
+        return res.status(401).json({ message: "Clerk authentication required" });
+      }
+
+      // Find user by Clerk ID
+      const user = await storage.getUserByClerkId(clerkUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Generate JWT for API access
+      const token = generateJWT({ id: user.id, username: user.username });
+      
+      res.json({ user, token });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to login user" });
+    }
+  });
+
+  // All other routes use JWT authentication
+  // Social account routes
+  app.get("/api/social-accounts", verifyJWT, async (req, res) => {
+    try {
+      const user = getJWTUser(req);
+      if (!user) {
         return res.status(401).json({ message: "User not authenticated" });
       }
-      const accounts = await storage.getSocialAccounts(parseInt(userId));
+      const accounts = await storage.getSocialAccounts(user.id);
       res.json({ accounts });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch social accounts" });
@@ -35,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ sessionId: req.sessionID, hasSession: !!(req as any).session });
   });
 
-  app.post("/api/auth/twitter/init", requireAuth, async (req, res) => {
+  app.post("/api/auth/twitter/init", verifyJWT, async (req, res) => {
     try {
       const oauthData = await socialMediaService.initializeTwitterOAuth();
       
@@ -68,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Facebook OAuth routes
-  app.post("/api/auth/facebook/init", requireAuth, async (req, res) => {
+  app.post("/api/auth/facebook/init", verifyJWT, async (req, res) => {
     try {
       const oauthData = await socialMediaService.initializeFacebookOAuth();
       
@@ -99,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/facebook/complete", requireAuth, async (req, res) => {
+  app.post("/api/auth/facebook/complete", verifyJWT, async (req, res) => {
     try {
       const { code, state } = req.body;
       
@@ -154,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // LinkedIn OAuth routes
-  app.post("/api/auth/linkedin/init", requireAuth, async (req, res) => {
+  app.post("/api/auth/linkedin/init", verifyJWT, async (req, res) => {
     try {
       const oauthData = await socialMediaService.initializeLinkedInOAuth();
       
@@ -185,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/linkedin/complete", requireAuth, async (req, res) => {
+  app.post("/api/auth/linkedin/complete", verifyJWT, async (req, res) => {
     try {
       const { code, state } = req.body;
       
@@ -240,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manual OAuth completion for localhost development
-  app.post("/api/auth/twitter/complete", requireAuth, async (req, res) => {
+  app.post("/api/auth/twitter/complete", verifyJWT, async (req, res) => {
     try {
       const { oauth_verifier } = req.body;
       
@@ -368,7 +417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/social-accounts", requireAuth, async (req, res) => {
+  app.post("/api/social-accounts", verifyJWT, async (req, res) => {
     try {
       const userId = getUserId(req);
       const accountData = insertSocialAccountSchema.parse({
@@ -383,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/social-accounts/:id", requireAuth, async (req, res) => {
+  app.delete("/api/social-accounts/:id", verifyJWT, async (req, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const deleted = await storage.deleteSocialAccount(accountId);
@@ -399,7 +448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Post routes
-  app.get("/api/posts", requireAuth, async (req, res) => {
+  app.get("/api/posts", verifyJWT, async (req, res) => {
     try {
       const { status, platform, limit } = req.query;
       const filters: any = {};
@@ -416,7 +465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/posts/schedule", requireAuth, async (req, res) => {
+  app.post("/api/posts/schedule", verifyJWT, async (req, res) => {
     try {
       console.log('Received post data:', req.body);
       
@@ -455,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/posts/:id", requireAuth, async (req, res) => {
+  app.put("/api/posts/:id", verifyJWT, async (req, res) => {
     try {
       const postId = parseInt(req.params.id);
       const updates = req.body;
@@ -476,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/posts/:id", requireAuth, async (req, res) => {
+  app.delete("/api/posts/:id", verifyJWT, async (req, res) => {
     try {
       const postId = parseInt(req.params.id);
       const deleted = await storage.deletePost(postId);
@@ -492,7 +541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get("/api/analytics/:postId", requireAuth, async (req, res) => {
+  app.get("/api/analytics/:postId", verifyJWT, async (req, res) => {
     try {
       const postId = parseInt(req.params.postId);
       const analytics = await storage.getAnalytics(postId);
@@ -502,7 +551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/user/summary", requireAuth, async (req, res) => {
+  app.get("/api/analytics/user/summary", verifyJWT, async (req, res) => {
     try {
       const { timeframe } = req.query;
       const userId = getUserId(req);
@@ -536,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Social media OAuth callback endpoints (simplified)
-  app.get("/api/auth/:platform/callback", requireAuth, async (req, res) => {
+  app.get("/api/auth/:platform/callback", verifyJWT, async (req, res) => {
     try {
       const { platform } = req.params;
       const { code } = req.query;
