@@ -28,6 +28,11 @@ export interface IStorage {
   createAnalytics(analytics: InsertAnalytics): Promise<Analytics>;
   updateAnalytics(id: number, updates: Partial<Analytics>): Promise<Analytics | undefined>;
   getUserAnalytics(userId: number, timeframe?: string): Promise<Analytics[]>;
+
+  // OAuth token operations
+  createOAuthToken(token: { userId: number; platform: string; oauthToken: string; oauthTokenSecret?: string; expiresAt: Date }): Promise<any>;
+  getOAuthToken(oauthToken: string): Promise<any>;
+  deleteOAuthToken(oauthToken: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -35,6 +40,7 @@ export class MemStorage implements IStorage {
   private socialAccounts: Map<number, SocialAccount>;
   private posts: Map<number, Post>;
   private analytics: Map<number, Analytics>;
+  private oauthTokens: Map<string, any>;
   private currentUserId: number;
   private currentSocialAccountId: number;
   private currentPostId: number;
@@ -45,6 +51,7 @@ export class MemStorage implements IStorage {
     this.socialAccounts = new Map();
     this.posts = new Map();
     this.analytics = new Map();
+    this.oauthTokens = new Map();
     this.currentUserId = 1;
     this.currentSocialAccountId = 1;
     this.currentPostId = 1;
@@ -245,6 +252,32 @@ export class MemStorage implements IStorage {
     }
 
     return analytics;
+  }
+
+  // OAuth token operations
+  async createOAuthToken(token: { userId: number; platform: string; oauthToken: string; oauthTokenSecret?: string; expiresAt: Date }): Promise<any> {
+    const tokenData = {
+      ...token,
+      createdAt: new Date()
+    };
+    this.oauthTokens.set(token.oauthToken, tokenData);
+    console.log('Created OAuth token:', token.oauthToken);
+    return tokenData;
+  }
+
+  async getOAuthToken(oauthToken: string): Promise<any> {
+    const token = this.oauthTokens.get(oauthToken);
+    if (token && token.expiresAt > new Date()) {
+      return token;
+    }
+    if (token) {
+      this.oauthTokens.delete(oauthToken); // Clean up expired token
+    }
+    return null;
+  }
+
+  async deleteOAuthToken(oauthToken: string): Promise<boolean> {
+    return this.oauthTokens.delete(oauthToken);
   }
 }
 

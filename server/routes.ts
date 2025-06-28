@@ -93,15 +93,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const oauthData = await socialMediaService.initializeTwitterOAuth(user.id.toString());
       
-      // Store OAuth tokens temporarily in session
-      (req as any).session.twitterOAuth = {
+      // Store OAuth tokens in database for reliable persistence
+      await storage.createOAuthToken({
+        userId: user.id,
+        platform: "twitter",
         oauthToken: oauthData.oauthToken,
         oauthTokenSecret: oauthData.oauthTokenSecret,
-        userId: user.id
-      };
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
+      });
 
-      console.log('Stored OAuth data in session:', {
-        sessionId: req.sessionID,
+      console.log('Stored OAuth data in database:', {
         oauthToken: oauthData.oauthToken,
         userId: user.id
       });
@@ -423,40 +424,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect("/accounts?error=twitter_auth_failed");
       }
 
-      // Retrieve stored OAuth data from session
-      const oauthData = (req as any).session.twitterOAuth;
-      console.log('Callback session data:', {
-        sessionId: req.sessionID,
-        hasOAuthData: !!oauthData,
-        storedToken: oauthData?.oauthToken,
+      // Retrieve stored OAuth data from database
+      const oauthData = await storage.getOAuthToken(oauth_token as string);
+      console.log('Callback token data:', {
         receivedToken: oauth_token,
         userIdFromUrl: user_id,
-        sessionData: oauthData
+        foundTokenData: !!oauthData,
+        storedUserId: oauthData?.userId
       });
       
-      // If session data is missing but we have user_id in URL, try to complete OAuth anyway
-      let userId = oauthData?.userId;
-      if (!userId && user_id) {
-        userId = parseInt(user_id as string);
-        console.log('Using user_id from URL parameters:', userId);
-      }
-      
-      if (!userId) {
-        console.log('No user ID available from session or URL');
-        return res.redirect("/accounts?error=twitter_auth_failed");
-      }
-
-      // For session validation, we'll be more lenient if we have the user_id from URL
-      if (oauthData && oauthData.oauthToken !== oauth_token) {
-        console.log('OAuth token mismatch in session');
-        return res.redirect("/accounts?error=twitter_auth_failed");
-      }
-
-      // Complete OAuth flow - we need the token secret from session
-      if (!oauthData?.oauthTokenSecret) {
-        console.log('Missing OAuth token secret from session');
+      if (!oauthData) {
+        console.log('No OAuth token found in database');
         return res.redirect("/accounts?error=twitter_session_expired");
       }
+
+      // Use userId from stored token data
+      const userId = oauthData.userId;
+      console.log('Using user_id from stored token:', userId);
 
       const result = await socialMediaService.completeTwitterOAuth(
         oauth_token as string,
@@ -474,10 +458,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         accessTokenSecret: result.accessTokenSecret,
       });
 
-      // Clear OAuth session data
-      if ((req as any).session.twitterOAuth) {
-        delete (req as any).session.twitterOAuth;
-      }
+      // Clean up OAuth token from database
+      await storage.deleteOAuthToken(oauth_token as string);
 
       console.log('Twitter account saved successfully for user:', userId);
       // Redirect back to social accounts page
