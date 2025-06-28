@@ -5,12 +5,48 @@ import { storage } from "./storage";
 import { insertUserSchema, insertSocialAccountSchema, insertPostSchema, platformSchema, postStatusSchema } from "@shared/schema";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { createClerkClient, verifyToken } from "@clerk/backend";
 import { socialMediaService } from "./services/social-media";
 import { scheduler } from "./services/scheduler";
 
+const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
 
-// Middleware to verify JWT token
+// Middleware to verify Clerk token
+const authenticateClerkToken = async (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  try {
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY
+    });
+    
+    // Get or create user in our system
+    const clerkUser = await clerkClient.users.getUser(payload.sub);
+    let user = await storage.getUserByUsername(clerkUser.id);
+    
+    if (!user) {
+      // Create user in our system using Clerk ID as username
+      user = await storage.createUser({
+        username: clerkUser.id,
+        password: 'clerk_user' // Placeholder since Clerk handles auth
+      });
+    }
+    
+    req.user = { userId: user.id, username: user.username, clerkId: clerkUser.id };
+    next();
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid or expired token' });
+  }
+};
+
+// Legacy JWT middleware for backward compatibility
 const authenticateToken = (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -75,7 +111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Social account routes
-  app.get("/api/social-accounts", authenticateToken, async (req: any, res) => {
+  app.get("/api/social-accounts", authenticateClerkToken, async (req: any, res) => {
     try {
       const accounts = await storage.getSocialAccounts(req.user.userId);
       res.json({ accounts });
@@ -94,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ sessionId: req.sessionID, hasSession: !!(req as any).session });
   });
 
-  app.post("/api/auth/twitter/init", authenticateToken, async (req: any, res) => {
+  app.post("/api/auth/twitter/init", authenticateClerkToken, async (req: any, res) => {
     try {
       const oauthData = await socialMediaService.initializeTwitterOAuth();
       
@@ -126,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manual OAuth completion for localhost development
-  app.post("/api/auth/twitter/complete", authenticateToken, async (req: any, res) => {
+  app.post("/api/auth/twitter/complete", authenticateClerkToken, async (req: any, res) => {
     try {
       const { oauth_verifier } = req.body;
       
@@ -260,7 +296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/social-accounts", authenticateToken, async (req: any, res) => {
+  app.post("/api/social-accounts", authenticateClerkToken, async (req: any, res) => {
     try {
       const accountData = insertSocialAccountSchema.parse({
         ...req.body,
@@ -274,7 +310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/social-accounts/:id", authenticateToken, async (req: any, res) => {
+  app.delete("/api/social-accounts/:id", authenticateClerkToken, async (req: any, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const deleted = await storage.deleteSocialAccount(accountId);
@@ -290,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Post routes
-  app.get("/api/posts", authenticateToken, async (req: any, res) => {
+  app.get("/api/posts", authenticateClerkToken, async (req: any, res) => {
     try {
       const { status, platform, limit } = req.query;
       const filters: any = {};
@@ -306,7 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/posts/schedule", authenticateToken, async (req: any, res) => {
+  app.post("/api/posts/schedule", authenticateClerkToken, async (req: any, res) => {
     try {
       console.log('Received post data:', req.body);
       
@@ -365,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/posts/:id", authenticateToken, async (req: any, res) => {
+  app.delete("/api/posts/:id", authenticateClerkToken, async (req: any, res) => {
     try {
       const postId = parseInt(req.params.id);
       const deleted = await storage.deletePost(postId);
@@ -381,7 +417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get("/api/analytics/:postId", authenticateToken, async (req: any, res) => {
+  app.get("/api/analytics/:postId", authenticateClerkToken, async (req: any, res) => {
     try {
       const postId = parseInt(req.params.postId);
       const analytics = await storage.getAnalytics(postId);
@@ -391,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/user/summary", authenticateToken, async (req: any, res) => {
+  app.get("/api/analytics/user/summary", authenticateClerkToken, async (req: any, res) => {
     try {
       const { timeframe } = req.query;
       const analytics = await storage.getUserAnalytics(req.user.userId, timeframe as string);
@@ -424,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Social media OAuth callback endpoints (simplified)
-  app.get("/api/auth/:platform/callback", authenticateToken, async (req: any, res) => {
+  app.get("/api/auth/:platform/callback", authenticateClerkToken, async (req: any, res) => {
     try {
       const { platform } = req.params;
       const { code } = req.query;

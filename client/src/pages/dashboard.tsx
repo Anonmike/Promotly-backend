@@ -4,11 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Calendar, TrendingUp, Users, MessageSquare, Heart, Share2, Activity, Sparkles, Zap, Target } from "lucide-react";
-import { authService } from "@/lib/auth";
+import { useUser } from "@clerk/clerk-react";
 import { useState, useEffect } from "react";
 
 export default function Dashboard() {
-  const [user, setUser] = useState(authService.getUser());
+  const { user } = useUser();
   const [greeting, setGreeting] = useState("");
   const [welcomeCardsVisible, setWelcomeCardsVisible] = useState([false, false, false]);
 
@@ -98,7 +98,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">
-                  {greeting}, {user?.username || 'there'}! 👋
+                  {greeting}, {user?.firstName || user?.username || 'there'}! 👋
                 </h3>
                 <p className="text-sm text-gray-600">Ready to amplify your reach?</p>
               </div>

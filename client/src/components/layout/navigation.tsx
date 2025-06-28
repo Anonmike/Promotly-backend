@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { 
   Home, 
   Calendar, 
@@ -66,24 +67,28 @@ export default function Navigation() {
 
           {/* Right Side Actions */}
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" className="relative" onClick={() => alert('Notifications feature coming soon!')}>
-              <Bell className="h-5 w-5" />
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs flex items-center justify-center"
-              >
-                3
-              </Badge>
-            </Button>
-            
-            <Button variant="ghost" size="sm" onClick={() => alert('Settings feature coming soon!')}>
-              <Settings className="h-5 w-5" />
-            </Button>
+            <SignedIn>
+              <Button variant="ghost" size="sm" className="relative" onClick={() => alert('Notifications feature coming soon!')}>
+                <Bell className="h-5 w-5" />
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs flex items-center justify-center"
+                >
+                  3
+                </Badge>
+              </Button>
+              
+              <Button variant="ghost" size="sm" onClick={() => alert('Settings feature coming soon!')}>
+                <Settings className="h-5 w-5" />
+              </Button>
 
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              Service Active
-            </Badge>
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                Service Active
+              </Badge>
+
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
           </div>
 
           {/* Mobile Navigation */}

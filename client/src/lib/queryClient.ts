@@ -1,5 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { authService } from "./auth";
+
+// Global token getter that will be set by Clerk
+let getClerkToken: () => Promise<string | null> = async () => null;
+
+export function setClerkTokenGetter(tokenGetter: () => Promise<string | null>) {
+  getClerkToken = tokenGetter;
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -13,7 +19,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const token = authService.getToken();
+  const token = await getClerkToken();
   
   const headers: Record<string, string> = {};
   if (data) {
@@ -40,7 +46,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const token = authService.getToken();
+    const token = await getClerkToken();
     
     const headers: Record<string, string> = {};
     if (token) {

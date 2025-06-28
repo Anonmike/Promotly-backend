@@ -119,6 +119,14 @@ Preferred communication style: Simple, everyday language.
   - Made Quick Post card clickable for direct navigation to schedule page
   - Dynamic Pro Tip content adapts based on user's account and post status
 
+- **June 28, 2025**: Integrated Clerk authentication system
+  - Added Clerk for user login and authentication (preserving social media OAuth)
+  - Updated frontend to use Clerk's SignIn component and user management
+  - Modified backend routes to accept and verify Clerk JWT tokens
+  - Preserved all existing social media OAuth functionality (Twitter, Facebook, LinkedIn)
+  - Users now sign in with Clerk but social account connections remain unchanged
+  - All API routes now use Clerk authentication while maintaining social posting features
+
 ## Changelog
 
 - June 27, 2025: Initial setup
