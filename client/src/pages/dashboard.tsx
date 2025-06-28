@@ -3,9 +3,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Calendar, TrendingUp, Users, MessageSquare, Heart, Share2, Activity } from "lucide-react";
+import { Calendar, TrendingUp, Users, MessageSquare, Heart, Share2, Activity, Sparkles, Zap, Target } from "lucide-react";
+import { authService } from "@/lib/auth";
+import { useState, useEffect } from "react";
 
 export default function Dashboard() {
+  const [user, setUser] = useState(authService.getUser());
+  const [greeting, setGreeting] = useState("");
+  const [welcomeCardsVisible, setWelcomeCardsVisible] = useState([false, false, false]);
+
+  useEffect(() => {
+    // Set time-based greeting
+    const hour = new Date().getHours();
+    if (hour < 12) {
+      setGreeting("Good morning");
+    } else if (hour < 17) {
+      setGreeting("Good afternoon");
+    } else {
+      setGreeting("Good evening");
+    }
+
+    // Staggered animation for welcome cards
+    const timers = [
+      setTimeout(() => setWelcomeCardsVisible(prev => [true, prev[1], prev[2]]), 200),
+      setTimeout(() => setWelcomeCardsVisible(prev => [prev[0], true, prev[2]]), 400),
+      setTimeout(() => setWelcomeCardsVisible(prev => [prev[0], prev[1], true]), 600),
+    ];
+
+    return () => timers.forEach(timer => clearTimeout(timer));
+  }, []);
+
   const { data: postsData, isLoading: postsLoading } = useQuery({
     queryKey: ["/api/posts?limit=5"],
   });
@@ -56,6 +83,71 @@ export default function Dashboard() {
             Schedule Post
           </Button>
         </Link>
+      </div>
+
+      {/* Animated Welcome Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Personal Greeting Card */}
+        <Card className={`bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200 transform hover:scale-105 transition-all duration-500 ease-out welcome-card-float ${
+          welcomeCardsVisible[0] ? 'opacity-100 translate-y-0 welcome-card-enter' : 'opacity-0 translate-y-4'
+        }`} style={{ animationDelay: '0s' }}>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-blue-500 rounded-full welcome-card-pulse">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {greeting}, {user?.username || 'there'}! 👋
+                </h3>
+                <p className="text-sm text-gray-600">Ready to amplify your reach?</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Action Card */}
+        <Link href="/schedule">
+          <Card className={`bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 transform hover:scale-105 transition-all duration-500 ease-out cursor-pointer welcome-card-float ${
+            welcomeCardsVisible[1] ? 'opacity-100 translate-y-0 welcome-card-enter' : 'opacity-0 translate-y-4'
+          }`} style={{ animationDelay: '2s' }}>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-green-500 rounded-full welcome-card-pulse">
+                  <Zap className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Quick Post</h3>
+                  <p className="text-sm text-gray-600">Share your thoughts instantly</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Growth Tip Card */}
+        <Card className={`bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200 transform hover:scale-105 transition-all duration-500 ease-out welcome-card-float ${
+          welcomeCardsVisible[2] ? 'opacity-100 translate-y-0 welcome-card-enter' : 'opacity-0 translate-y-4'
+        }`} style={{ animationDelay: '4s' }}>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-purple-500 rounded-full welcome-card-pulse">
+                <Target className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Pro Tip</h3>
+                <p className="text-sm text-gray-600">
+                  {accounts.length === 0 
+                    ? "Connect your social accounts first"
+                    : recentPosts.length === 0 
+                    ? "Schedule posts for peak hours"
+                    : "Consistent posting boosts engagement"
+                  }
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Stats Cards */}

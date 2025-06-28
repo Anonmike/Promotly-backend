@@ -111,6 +111,14 @@ Preferred communication style: Simple, everyday language.
   - Updated page titles, headings, and descriptions to reflect Promotly branding
   - Maintained all existing functionality while enhancing brand identity
 
+- **June 28, 2025**: Implemented animated dashboard welcome cards
+  - Added personalized greeting cards with time-based salutations (Good morning/afternoon/evening)
+  - Created three animated welcome cards: Personal Greeting, Quick Post, and Pro Tip
+  - Implemented staggered entrance animations with CSS keyframes
+  - Added floating and pulse animations for dynamic visual effects
+  - Made Quick Post card clickable for direct navigation to schedule page
+  - Dynamic Pro Tip content adapts based on user's account and post status
+
 ## Changelog
 
 - June 27, 2025: Initial setup
