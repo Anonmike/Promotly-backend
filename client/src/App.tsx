@@ -85,7 +85,14 @@ function AuthenticatedApp() {
     const updateToken = async () => {
       try {
         const token = await getToken();
-        setClerkToken(token);
+        console.log('Clerk token obtained:', token ? 'Token present' : 'No token');
+        if (token) {
+          console.log('Setting token in query client');
+          setClerkToken(token);
+        } else {
+          console.log('No token available');
+          setClerkToken(null);
+        }
       } catch (error) {
         console.error('Failed to get Clerk token:', error);
         setClerkToken(null);

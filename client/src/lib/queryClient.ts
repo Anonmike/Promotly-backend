@@ -25,6 +25,9 @@ export async function apiRequest(
   }
   if (clerkToken) {
     headers["Authorization"] = `Bearer ${clerkToken}`;
+    console.log('API request with token to:', url);
+  } else {
+    console.log('API request WITHOUT token to:', url);
   }
 
   const res = await fetch(url, {
@@ -47,6 +50,9 @@ export const getQueryFn: <T>(options: {
     const headers: Record<string, string> = {};
     if (clerkToken) {
       headers["Authorization"] = `Bearer ${clerkToken}`;
+      console.log('Query with token to:', queryKey[0]);
+    } else {
+      console.log('Query WITHOUT token to:', queryKey[0]);
     }
     
     const res = await fetch(queryKey[0] as string, {
@@ -55,6 +61,7 @@ export const getQueryFn: <T>(options: {
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      console.log('401 error for query:', queryKey[0]);
       return null;
     }
 
