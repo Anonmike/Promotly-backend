@@ -141,11 +141,10 @@ export class SocialMediaService {
         appSecret: process.env.TWITTER_CONSUMER_SECRET!,
       });
 
-      // For now, use a simple callback URL that Twitter can approve
-      const callbackUrl = 'http://127.0.0.1:5000/api/auth/twitter/callback';
+      // Use the production domain for Twitter OAuth callback
+      const callbackUrl = 'https://app.promotlyai.com/api/auth/twitter/callback';
       
-      console.log('Twitter OAuth callback URL (localhost):', callbackUrl);
-      console.log('Note: Using localhost callback for testing - this must be added to Twitter app settings');
+      console.log('Twitter OAuth callback URL:', callbackUrl);
       
       // Try with different OAuth settings
       const authLink = await client.generateAuthLink(
@@ -170,7 +169,7 @@ export class SocialMediaService {
       if (error && typeof error === 'object' && 'data' in error) {
         const errorData = (error as any).data;
         if (typeof errorData === 'string' && errorData.includes('Callback URL not approved')) {
-          throw new Error(`Twitter app configuration error: The callback URL "http://127.0.0.1:5000/api/auth/twitter/callback" is not approved in your Twitter app settings. Please add this exact URL to your approved callback URLs list in the Twitter Developer Portal.`);
+          throw new Error(`Twitter app configuration error: The callback URL "https://app.promotlyai.com/api/auth/twitter/callback" is not approved in your Twitter app settings. Please add this exact URL to your approved callback URLs list in the Twitter Developer Portal.`);
         }
         if (typeof errorData === 'string' && errorData.includes('Invalid consumer key')) {
           throw new Error('Twitter app configuration error: Invalid consumer key. Please check your TWITTER_CONSUMER_KEY and TWITTER_CONSUMER_SECRET environment variables.');
