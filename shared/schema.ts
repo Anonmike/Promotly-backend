@@ -14,6 +14,7 @@ export const socialAccounts = pgTable("social_accounts", {
   platform: text("platform").notNull(), // twitter, facebook, linkedin, etc.
   accountId: text("account_id").notNull(),
   accessToken: text("access_token").notNull(),
+  accessTokenSecret: text("access_token_secret"), // For OAuth 1.0a (Twitter)
   refreshToken: text("refresh_token"),
   expiresAt: timestamp("expires_at"),
   accountName: text("account_name").notNull(),
@@ -60,6 +61,7 @@ export const insertSocialAccountSchema = createInsertSchema(socialAccounts).pick
   platform: true,
   accountId: true,
   accessToken: true,
+  accessTokenSecret: true,
   refreshToken: true,
   expiresAt: true,
   accountName: true,

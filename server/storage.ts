@@ -81,6 +81,7 @@ export class MemStorage implements IStorage {
     const account: SocialAccount = {
       ...insertAccount,
       id,
+      accessTokenSecret: insertAccount.accessTokenSecret ?? null,
       isActive: true,
       createdAt: new Date(),
       refreshToken: insertAccount.refreshToken || null,

@@ -131,16 +131,70 @@ export class SocialMediaService {
     
     if (!this.twitterClients.has(key)) {
       const client = new TwitterApi({
-        appKey: process.env.TWITTER_API_KEY || '',
-        appSecret: process.env.TWITTER_API_SECRET || '',
+        appKey: process.env.TWITTER_CONSUMER_KEY!,
+        appSecret: process.env.TWITTER_CONSUMER_SECRET!,
         accessToken: account.accessToken,
-        accessSecret: account.refreshToken || '', // Using refresh token as access secret
+        accessSecret: account.accessTokenSecret!,
       });
       
       this.twitterClients.set(key, client);
     }
 
     return this.twitterClients.get(key)!;
+  }
+
+  // Twitter OAuth Flow
+  async initializeTwitterOAuth(): Promise<{ authUrl: string; oauthToken: string; oauthTokenSecret: string }> {
+    try {
+      const client = new TwitterApi({
+        appKey: process.env.TWITTER_CONSUMER_KEY!,
+        appSecret: process.env.TWITTER_CONSUMER_SECRET!,
+      });
+
+      const authLink = await client.generateAuthLink(
+        `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/twitter/callback`,
+        { linkMode: 'authorize' }
+      );
+
+      return {
+        authUrl: authLink.url,
+        oauthToken: authLink.oauth_token,
+        oauthTokenSecret: authLink.oauth_token_secret,
+      };
+    } catch (error) {
+      console.error('Twitter OAuth initialization error:', error);
+      if (error instanceof Error && error.message.includes('403')) {
+        throw new Error('Twitter app configuration error: Please add the callback URL to your Twitter app settings in the Developer Portal');
+      }
+      throw new Error(`Failed to initialize Twitter OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async completeTwitterOAuth(
+    oauthToken: string,
+    oauthTokenSecret: string,
+    oauthVerifier: string
+  ): Promise<{ accessToken: string; accessTokenSecret: string; userId: string; screenName: string }> {
+    try {
+      const client = new TwitterApi({
+        appKey: process.env.TWITTER_CONSUMER_KEY!,
+        appSecret: process.env.TWITTER_CONSUMER_SECRET!,
+        accessToken: oauthToken,
+        accessSecret: oauthTokenSecret,
+      });
+
+      const loginResult = await client.login(oauthVerifier);
+      
+      return {
+        accessToken: loginResult.accessToken,
+        accessTokenSecret: loginResult.accessSecret,
+        userId: loginResult.userId,
+        screenName: loginResult.screenName,
+      };
+    } catch (error) {
+      console.error('Twitter OAuth completion error:', error);
+      throw new Error(`Failed to complete Twitter OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   private async uploadMediaToTwitter(client: TwitterApi, mediaUrls: string[]): Promise<string[]> {

@@ -84,6 +84,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Twitter OAuth routes
+  app.post("/api/auth/twitter/init", authenticateToken, async (req: any, res) => {
+    try {
+      const oauthData = await socialMediaService.initializeTwitterOAuth();
+      
+      // Store OAuth tokens temporarily in session
+      (req as any).session.twitterOAuth = {
+        oauthToken: oauthData.oauthToken,
+        oauthTokenSecret: oauthData.oauthTokenSecret,
+        userId: req.user.userId
+      };
+
+      res.json({ authUrl: oauthData.authUrl });
+    } catch (error) {
+      console.error('Twitter OAuth init error:', error);
+      res.status(500).json({ 
+        message: "Failed to initialize Twitter OAuth",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get("/api/auth/twitter/callback", async (req, res) => {
+    try {
+      const { oauth_token, oauth_verifier } = req.query;
+      
+      if (!oauth_token || !oauth_verifier) {
+        return res.status(400).json({ message: "Missing OAuth parameters" });
+      }
+
+      // Retrieve stored OAuth data
+      const oauthData = (req as any).session.twitterOAuth;
+      if (!oauthData || oauthData.oauthToken !== oauth_token) {
+        return res.status(400).json({ message: "Invalid OAuth session" });
+      }
+
+      // Complete OAuth flow
+      const result = await socialMediaService.completeTwitterOAuth(
+        oauthData.oauthToken,
+        oauthData.oauthTokenSecret,
+        oauth_verifier as string
+      );
+
+      // Store the Twitter account
+      await storage.createSocialAccount({
+        userId: oauthData.userId,
+        platform: "twitter",
+        accountId: result.userId,
+        accountName: result.screenName,
+        accessToken: result.accessToken,
+        accessTokenSecret: result.accessTokenSecret,
+      });
+
+      // Clear OAuth session data
+      delete (req as any).session.twitterOAuth;
+
+      // Redirect back to social accounts page
+      res.redirect("/?connected=twitter");
+    } catch (error) {
+      console.error('Twitter OAuth callback error:', error);
+      res.redirect("/?error=twitter_auth_failed");
+    }
+  });
+
   app.post("/api/social-accounts", authenticateToken, async (req: any, res) => {
     try {
       const accountData = insertSocialAccountSchema.parse({
