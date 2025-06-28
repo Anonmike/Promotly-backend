@@ -107,34 +107,7 @@ export default function Navigation() {
           </div>
 
           {/* Mobile Navigation */}
-          <div className="md:hidden flex items-center space-x-2">
-            <SignedIn>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="relative" 
-                onClick={() => {
-                  if (failedPosts > 0) {
-                    alert(`${failedPosts} post(s) failed to publish. Check your Posts page for details.`);
-                  } else if (recentSuccessfulPosts > 0) {
-                    alert(`${recentSuccessfulPosts} post(s) successfully published in the last 24 hours.`);
-                  } else {
-                    alert('No recent notifications');
-                  }
-                }}
-              >
-                <Bell className="h-5 w-5" />
-                {notificationCount > 0 && (
-                  <Badge 
-                    variant={failedPosts > 0 ? "destructive" : "default"}
-                    className="absolute -top-1 -right-1 h-4 w-4 p-0 text-xs flex items-center justify-center"
-                  >
-                    {notificationCount}
-                  </Badge>
-                )}
-              </Button>
-              <UserButton afterSignOutUrl="/" />
-            </SignedIn>
+          <div className="md:hidden">
             <Button 
               variant="ghost" 
               size="sm"
