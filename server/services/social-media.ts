@@ -151,7 +151,9 @@ export class SocialMediaService {
         appSecret: process.env.TWITTER_CONSUMER_SECRET!,
       });
 
-      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/twitter/callback`;
+      const callbackUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://app.promotlyai.com/api/auth/twitter/callback'
+        : `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/twitter/callback`;
       console.log('Twitter OAuth callback URL:', callbackUrl);
       
       const authLink = await client.generateAuthLink(

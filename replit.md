@@ -96,7 +96,16 @@ The application follows a monorepo structure with clear separation between clien
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+- **June 28, 2025**: Implemented Twitter OAuth authentication system
+  - Replaced manual token input with secure OAuth 1.0a flow
+  - Added session-based OAuth state management
+  - Created manual OAuth completion interface for localhost development
+  - Configured production callback URL for app.promotlyai.com
+  - Twitter app requires callback URLs: `http://localhost:5000/api/auth/twitter/callback` (dev) and `https://app.promotlyai.com/api/auth/twitter/callback` (prod)
+
 ## Changelog
 
-Changelog:
-- June 27, 2025. Initial setup
+- June 27, 2025: Initial setup
+- June 28, 2025: Twitter OAuth implementation and production configuration

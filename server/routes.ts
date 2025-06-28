@@ -247,10 +247,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       delete (req as any).session.twitterOAuth;
 
       // Redirect back to social accounts page
-      res.redirect("/?connected=twitter");
+      const redirectUrl = process.env.NODE_ENV === 'production' 
+        ? "https://app.promotlyai.com/?connected=twitter"
+        : "/?connected=twitter";
+      res.redirect(redirectUrl);
     } catch (error) {
       console.error('Twitter OAuth callback error:', error);
-      res.redirect("/?error=twitter_auth_failed");
+      const errorRedirectUrl = process.env.NODE_ENV === 'production' 
+        ? "https://app.promotlyai.com/?error=twitter_auth_failed"
+        : "/?error=twitter_auth_failed";
+      res.redirect(errorRedirectUrl);
     }
   });
 
