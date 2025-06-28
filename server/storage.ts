@@ -21,6 +21,7 @@ export interface IStorage {
   updatePost(id: number, updates: Partial<Post>): Promise<Post | undefined>;
   deletePost(id: number): Promise<boolean>;
   getScheduledPosts(): Promise<Post[]>;
+  getAllPublishedPosts(): Promise<Post[]>;
 
   // Analytics operations
   getAnalytics(postId: number): Promise<Analytics[]>;
@@ -178,6 +179,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.posts.values()).filter(
       post => post.status === "scheduled" && new Date(post.scheduledFor) <= now
     );
+  }
+
+  async getAllPublishedPosts(): Promise<Post[]> {
+    return Array.from(this.posts.values()).filter(post => post.status === "published");
   }
 
   // Analytics operations

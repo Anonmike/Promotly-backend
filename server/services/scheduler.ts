@@ -140,7 +140,7 @@ export class SchedulerService {
   // Method to manually trigger analytics collection for all published posts
   async refreshAllAnalytics() {
     try {
-      const publishedPosts = await storage.getPosts(0, { status: "published" }); // Get all published posts
+      const publishedPosts = await storage.getAllPublishedPosts(); // Get all published posts
       
       for (const post of publishedPosts) {
         if (post.socialPostIds && Object.keys(post.socialPostIds).length > 0) {
