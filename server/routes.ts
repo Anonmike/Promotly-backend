@@ -497,6 +497,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get social accounts
+  app.get("/api/social-accounts", verifyJWT, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      console.log('Fetching social accounts for user:', userId);
+      
+      const accounts = await storage.getSocialAccounts(parseInt(userId!));
+      console.log('Retrieved accounts:', accounts);
+      
+      res.json({ accounts });
+    } catch (error) {
+      console.error('Failed to fetch social accounts:', error);
+      res.status(500).json({ message: "Failed to fetch social accounts" });
+    }
+  });
+
   app.post("/api/social-accounts", verifyJWT, async (req, res) => {
     try {
       const userId = getUserId(req);
