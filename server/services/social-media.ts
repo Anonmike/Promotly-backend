@@ -144,8 +144,8 @@ export class SocialMediaService {
       const baseUrl = process.env.REPLIT_DOMAINS 
         ? 'https://app.promotlyai.com' 
         : (process.env.BASE_URL || 'http://localhost:5000');
-      const callbackUrl = `${baseUrl}/api/auth/twitter/callback?user_id=${userId}`;
-      console.log('Twitter OAuth callback URL:', callbackUrl);
+      const callbackUrl = `${baseUrl}/api/auth/twitter/callback`;
+      console.log('Twitter OAuth callback URL (clean):', callbackUrl);
       
       const authLink = await client.generateAuthLink(
         callbackUrl,

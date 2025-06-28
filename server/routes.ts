@@ -423,15 +423,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/twitter/callback", async (req, res) => {
-    console.log('=== TWITTER CALLBACK DEBUG ===');
+    console.log('=== TWITTER CALLBACK RECEIVED ===');
     console.log('Query params:', req.query);
-    console.log('Headers:', {
-      'user-agent': req.headers['user-agent'],
-      'cookie': req.headers.cookie,
-      'referer': req.headers.referer
-    });
     console.log('Session ID:', req.sessionID);
-    console.log('================================');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('==================================');
     
     try {
       const { oauth_token, oauth_verifier, denied, user_id } = req.query;
@@ -452,7 +448,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oauthData = await storage.getOAuthToken(oauth_token as string);
       console.log('OAuth token lookup result:', {
         receivedToken: oauth_token,
-        userIdFromUrl: user_id,
         foundTokenData: !!oauthData,
         storedUserId: oauthData?.userId,
         storedTokenSecret: oauthData?.oauthTokenSecret ? 'present' : 'missing',
