@@ -135,6 +135,13 @@ Preferred communication style: Simple, everyday language.
   - Created notification hook that polls for post status changes every 10 seconds
   - Users receive immediate feedback for all post operations with descriptive messages
 
+- **June 28, 2025**: Added direct authentication routing
+  - Created dedicated /signin and /signup pages with Promotly branding
+  - Implemented proper routing to handle direct authentication URLs
+  - Added cross-linking between signin and signup pages for better UX
+  - Users can now access authentication pages directly via browser URLs
+  - Maintained seamless authentication flow with proper redirect handling
+
 ## Changelog
 
 - June 27, 2025: Initial setup
