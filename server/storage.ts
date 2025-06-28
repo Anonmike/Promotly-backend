@@ -266,13 +266,22 @@ export class MemStorage implements IStorage {
   }
 
   async getOAuthToken(oauthToken: string): Promise<any> {
+    console.log('Looking up OAuth token in storage:', oauthToken);
+    console.log('Total tokens in storage:', this.oauthTokens.size);
+    console.log('Available tokens:', Array.from(this.oauthTokens.keys()));
+    
     const token = this.oauthTokens.get(oauthToken);
+    console.log('Found token:', !!token);
+    
     if (token && token.expiresAt > new Date()) {
+      console.log('Token is valid and not expired');
       return token;
     }
     if (token) {
+      console.log('Token expired, cleaning up');
       this.oauthTokens.delete(oauthToken); // Clean up expired token
     }
+    console.log('No valid token found');
     return null;
   }
 

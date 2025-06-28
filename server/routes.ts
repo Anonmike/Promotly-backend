@@ -111,7 +111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         authUrl: oauthData.authUrl,
         oauthToken: oauthData.oauthToken,
         oauthTokenSecret: oauthData.oauthTokenSecret,
-        message: "OAuth tokens provided for session-less completion"
+        message: "OAuth tokens stored in database for reliable completion"
       });
     } catch (error) {
       console.error('Twitter OAuth init error:', error);
@@ -119,6 +119,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to initialize Twitter OAuth",
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  });
+
+  // Debug endpoint to check stored OAuth tokens
+  app.get("/api/debug/oauth-tokens", async (req, res) => {
+    try {
+      const allTokens = Array.from((storage as any).oauthTokens.entries());
+      res.json({
+        totalTokens: allTokens.length,
+        tokens: allTokens.map(([key, value]) => ({
+          token: key.substring(0, 10) + '...',
+          userId: value.userId,
+          platform: value.platform,
+          expiresAt: value.expiresAt,
+          isExpired: value.expiresAt < new Date(),
+          createdAt: value.createdAt
+        }))
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get debug info' });
     }
   });
 
@@ -403,12 +423,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/twitter/callback", async (req, res) => {
-    console.log('Twitter callback received:', {
-      query: req.query,
-      headers: req.headers,
-      session: (req as any).session?.twitterOAuth ? 'present' : 'missing',
-      sessionId: req.sessionID
+    console.log('=== TWITTER CALLBACK DEBUG ===');
+    console.log('Query params:', req.query);
+    console.log('Headers:', {
+      'user-agent': req.headers['user-agent'],
+      'cookie': req.headers.cookie,
+      'referer': req.headers.referer
     });
+    console.log('Session ID:', req.sessionID);
+    console.log('================================');
     
     try {
       const { oauth_token, oauth_verifier, denied, user_id } = req.query;
@@ -425,12 +448,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve stored OAuth data from database
+      console.log('Looking up OAuth token:', oauth_token);
       const oauthData = await storage.getOAuthToken(oauth_token as string);
-      console.log('Callback token data:', {
+      console.log('OAuth token lookup result:', {
         receivedToken: oauth_token,
         userIdFromUrl: user_id,
         foundTokenData: !!oauthData,
-        storedUserId: oauthData?.userId
+        storedUserId: oauthData?.userId,
+        storedTokenSecret: oauthData?.oauthTokenSecret ? 'present' : 'missing',
+        expiresAt: oauthData?.expiresAt,
+        currentTime: new Date()
       });
       
       if (!oauthData) {
