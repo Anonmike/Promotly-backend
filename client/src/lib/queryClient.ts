@@ -20,8 +20,11 @@ export async function apiRequest(
   }
   
   const token = authService.getToken();
+  console.log('API Request - Token check:', { hasToken: !!token, tokenLength: token?.length });
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  } else {
+    console.warn('No auth token found for API request');
   }
 
   const res = await fetch(url, {
@@ -43,8 +46,11 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const headers: Record<string, string> = {};
     const token = authService.getToken();
+    console.log('Query Function - Token check:', { hasToken: !!token, tokenLength: token?.length, queryKey: queryKey[0] });
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
+    } else {
+      console.warn('No auth token found for query:', queryKey[0]);
     }
     
     const res = await fetch(queryKey[0] as string, {
