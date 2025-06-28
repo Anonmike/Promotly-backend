@@ -107,10 +107,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/twitter/callback", async (req, res) => {
+    console.log('Twitter callback received:', {
+      query: req.query,
+      session: (req as any).session?.twitterOAuth ? 'present' : 'missing'
+    });
+    
     try {
       const { oauth_token, oauth_verifier } = req.query;
       
       if (!oauth_token || !oauth_verifier) {
+        console.log('Missing OAuth parameters:', { oauth_token, oauth_verifier });
         return res.status(400).json({ message: "Missing OAuth parameters" });
       }
 

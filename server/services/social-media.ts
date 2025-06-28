@@ -151,10 +151,15 @@ export class SocialMediaService {
         appSecret: process.env.TWITTER_CONSUMER_SECRET!,
       });
 
+      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/twitter/callback`;
+      console.log('Twitter OAuth callback URL:', callbackUrl);
+      
       const authLink = await client.generateAuthLink(
-        `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/twitter/callback`,
+        callbackUrl,
         { linkMode: 'authorize' }
       );
+
+      console.log('Twitter OAuth URL generated:', authLink.url);
 
       return {
         authUrl: authLink.url,
