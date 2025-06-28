@@ -31,10 +31,10 @@ export default function Navigation() {
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center flex-shrink-0">
             <Link href="/">
               <div className="flex items-center space-x-3 cursor-pointer">
                 <img src={promotlyLogo} alt="Promotly" className="h-8 w-8" />
@@ -43,8 +43,8 @@ export default function Navigation() {
             </Link>
           </div>
 
-          {/* Navigation Links */}
-          <div className="hidden md:flex items-center space-x-8">
+          {/* Navigation Links - centered */}
+          <div className="hidden md:flex items-center space-x-6 flex-1 justify-center">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location === item.href;
@@ -53,6 +53,7 @@ export default function Navigation() {
                 <Link key={item.href} href={item.href}>
                   <Button
                     variant={isActive ? "default" : "ghost"}
+                    size="sm"
                     className={`flex items-center space-x-2 ${
                       isActive 
                         ? "bg-blue-600 text-white hover:bg-blue-700" 
@@ -68,7 +69,7 @@ export default function Navigation() {
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 flex-shrink-0">
             <SignedIn>
               <Button 
                 variant="ghost" 
@@ -106,7 +107,34 @@ export default function Navigation() {
           </div>
 
           {/* Mobile Navigation */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center space-x-2">
+            <SignedIn>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="relative" 
+                onClick={() => {
+                  if (failedPosts > 0) {
+                    alert(`${failedPosts} post(s) failed to publish. Check your Posts page for details.`);
+                  } else if (recentSuccessfulPosts > 0) {
+                    alert(`${recentSuccessfulPosts} post(s) successfully published in the last 24 hours.`);
+                  } else {
+                    alert('No recent notifications');
+                  }
+                }}
+              >
+                <Bell className="h-5 w-5" />
+                {notificationCount > 0 && (
+                  <Badge 
+                    variant={failedPosts > 0 ? "destructive" : "default"}
+                    className="absolute -top-1 -right-1 h-4 w-4 p-0 text-xs flex items-center justify-center"
+                  >
+                    {notificationCount}
+                  </Badge>
+                )}
+              </Button>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
             <Button 
               variant="ghost" 
               size="sm"
