@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
+import { Twitter, Trash2, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 
 interface SocialAccount {
   id: number;
@@ -31,20 +31,7 @@ export default function SocialAccounts() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       window.history.replaceState({}, '', window.location.pathname);
-    } else if (connected === 'facebook') {
-      toast({
-        title: "Success!",
-        description: "Facebook account connected successfully.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
-      window.history.replaceState({}, '', window.location.pathname);
-    } else if (connected === 'linkedin') {
-      toast({
-        title: "Success!",
-        description: "LinkedIn account connected successfully.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
-      window.history.replaceState({}, '', window.location.pathname);
+
     } else if (error === 'twitter_auth_failed') {
       toast({
         title: "Connection Failed",
@@ -118,58 +105,8 @@ export default function SocialAccounts() {
     },
   });
 
-  const facebookOAuthMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/auth/facebook/init");
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Redirecting to Facebook",
-        description: "You'll be redirected to Facebook for authorization.",
-      });
-      window.location.href = data.authUrl;
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to initialize Facebook authorization",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const linkedinOAuthMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/auth/linkedin/init");
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Redirecting to LinkedIn",
-        description: "You'll be redirected to LinkedIn for authorization.",
-      });
-      window.location.href = data.authUrl;
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to initialize LinkedIn authorization",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleConnectTwitter = () => {
     twitterOAuthMutation.mutate();
-  };
-
-  const handleConnectFacebook = () => {
-    facebookOAuthMutation.mutate();
-  };
-
-  const handleConnectLinkedIn = () => {
-    linkedinOAuthMutation.mutate();
   };
 
   return (
@@ -240,87 +177,7 @@ export default function SocialAccounts() {
               </div>
             </div>
 
-            {/* Facebook */}
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 rounded-full bg-blue-600">
-                  <Facebook className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Facebook</h3>
-                  <p className="text-sm text-gray-600">Schedule posts and manage your Facebook pages</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {accounts.find(account => account.platform === 'facebook') ? (
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="default" className="flex items-center space-x-1">
-                      <CheckCircle className="h-3 w-3" />
-                      <span>Connected as {accounts.find(account => account.platform === 'facebook')?.accountName}</span>
-                    </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(accounts.find(account => account.platform === 'facebook')!.id)}
-                      disabled={deleteMutation.isPending}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Button 
-                    onClick={handleConnectFacebook}
-                    disabled={facebookOAuthMutation.isPending}
-                    className="flex items-center space-x-2"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    <span>{facebookOAuthMutation.isPending ? "Connecting..." : "Connect Facebook"}</span>
-                  </Button>
-                )}
-              </div>
-            </div>
 
-            {/* LinkedIn */}
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 rounded-full bg-blue-700">
-                  <Linkedin className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">LinkedIn</h3>
-                  <p className="text-sm text-gray-600">Share professional content with your network</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {accounts.find(account => account.platform === 'linkedin') ? (
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="default" className="flex items-center space-x-1">
-                      <CheckCircle className="h-3 w-3" />
-                      <span>Connected as {accounts.find(account => account.platform === 'linkedin')?.accountName}</span>
-                    </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(accounts.find(account => account.platform === 'linkedin')!.id)}
-                      disabled={deleteMutation.isPending}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Button 
-                    onClick={handleConnectLinkedIn}
-                    disabled={linkedinOAuthMutation.isPending}
-                    className="flex items-center space-x-2"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    <span>{linkedinOAuthMutation.isPending ? "Connecting..." : "Connect LinkedIn"}</span>
-                  </Button>
-                )}
-              </div>
-            </div>
 
             {/* Information Card */}
             <Card className="border-blue-200 bg-blue-50">
