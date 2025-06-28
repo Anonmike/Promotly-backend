@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { useNotifications } from "@/hooks/use-notifications";
+import { NotificationModal, SettingsModal } from "@/components/ui/modal";
 import { 
   Home, 
   Calendar, 
@@ -19,6 +20,8 @@ import promotlyLogo from "@/assets/promotly-logo.png";
 export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const { notificationCount, failedPosts, recentSuccessfulPosts } = useNotifications();
 
   const navItems = [
@@ -75,15 +78,7 @@ export default function Navigation() {
                 variant="ghost" 
                 size="sm" 
                 className="relative" 
-                onClick={() => {
-                  if (failedPosts > 0) {
-                    alert(`${failedPosts} post(s) failed to publish. Check your Posts page for details.`);
-                  } else if (recentSuccessfulPosts > 0) {
-                    alert(`${recentSuccessfulPosts} post(s) successfully published in the last 24 hours.`);
-                  } else {
-                    alert('No recent notifications');
-                  }
-                }}
+                onClick={() => setIsNotificationModalOpen(true)}
               >
                 <Bell className="h-5 w-5" />
                 {notificationCount > 0 && (
@@ -96,7 +91,7 @@ export default function Navigation() {
                 )}
               </Button>
               
-              <Button variant="ghost" size="sm" onClick={() => alert('Settings feature coming soon!')}>
+              <Button variant="ghost" size="sm" onClick={() => setIsSettingsModalOpen(true)}>
                 <Settings className="h-5 w-5" />
               </Button>
 
@@ -152,6 +147,19 @@ export default function Navigation() {
           </div>
         )}
       </div>
+      
+      {/* Modals */}
+      <NotificationModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
+        failedPosts={failedPosts}
+        recentSuccessfulPosts={recentSuccessfulPosts}
+      />
+      
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+      />
     </nav>
   );
 }
