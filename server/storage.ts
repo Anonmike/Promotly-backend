@@ -4,7 +4,6 @@ export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  getUserByClerkId(clerkUserId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
   // Social account operations
@@ -21,18 +20,12 @@ export interface IStorage {
   updatePost(id: number, updates: Partial<Post>): Promise<Post | undefined>;
   deletePost(id: number): Promise<boolean>;
   getScheduledPosts(): Promise<Post[]>;
-  getAllPublishedPosts(): Promise<Post[]>;
 
   // Analytics operations
   getAnalytics(postId: number): Promise<Analytics[]>;
   createAnalytics(analytics: InsertAnalytics): Promise<Analytics>;
   updateAnalytics(id: number, updates: Partial<Analytics>): Promise<Analytics | undefined>;
   getUserAnalytics(userId: number, timeframe?: string): Promise<Analytics[]>;
-
-  // OAuth token operations
-  createOAuthToken(token: { userId: number; platform: string; oauthToken: string; oauthTokenSecret?: string; expiresAt: Date }): Promise<any>;
-  getOAuthToken(oauthToken: string): Promise<any>;
-  deleteOAuthToken(oauthToken: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -40,7 +33,6 @@ export class MemStorage implements IStorage {
   private socialAccounts: Map<number, SocialAccount>;
   private posts: Map<number, Post>;
   private analytics: Map<number, Analytics>;
-  private oauthTokens: Map<string, any>;
   private currentUserId: number;
   private currentSocialAccountId: number;
   private currentPostId: number;
@@ -51,7 +43,6 @@ export class MemStorage implements IStorage {
     this.socialAccounts = new Map();
     this.posts = new Map();
     this.analytics = new Map();
-    this.oauthTokens = new Map();
     this.currentUserId = 1;
     this.currentSocialAccountId = 1;
     this.currentPostId = 1;
@@ -67,18 +58,9 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).find(user => user.username === username);
   }
 
-  async getUserByClerkId(clerkUserId: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.clerkUserId === clerkUserId);
-  }
-
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { 
-      id,
-      username: insertUser.username,
-      password: insertUser.password || null,
-      clerkUserId: insertUser.clerkUserId || null
-    };
+    const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
   }
@@ -188,10 +170,6 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async getAllPublishedPosts(): Promise<Post[]> {
-    return Array.from(this.posts.values()).filter(post => post.status === "published");
-  }
-
   // Analytics operations
   async getAnalytics(postId: number): Promise<Analytics[]> {
     return Array.from(this.analytics.values()).filter(analytics => analytics.postId === postId);
@@ -252,41 +230,6 @@ export class MemStorage implements IStorage {
     }
 
     return analytics;
-  }
-
-  // OAuth token operations
-  async createOAuthToken(token: { userId: number; platform: string; oauthToken: string; oauthTokenSecret?: string; expiresAt: Date }): Promise<any> {
-    const tokenData = {
-      ...token,
-      createdAt: new Date()
-    };
-    this.oauthTokens.set(token.oauthToken, tokenData);
-    console.log('Created OAuth token:', token.oauthToken);
-    return tokenData;
-  }
-
-  async getOAuthToken(oauthToken: string): Promise<any> {
-    console.log('Looking up OAuth token in storage:', oauthToken);
-    console.log('Total tokens in storage:', this.oauthTokens.size);
-    console.log('Available tokens:', Array.from(this.oauthTokens.keys()));
-    
-    const token = this.oauthTokens.get(oauthToken);
-    console.log('Found token:', !!token);
-    
-    if (token && token.expiresAt > new Date()) {
-      console.log('Token is valid and not expired');
-      return token;
-    }
-    if (token) {
-      console.log('Token expired, cleaning up');
-      this.oauthTokens.delete(oauthToken); // Clean up expired token
-    }
-    console.log('No valid token found');
-    return null;
-  }
-
-  async deleteOAuthToken(oauthToken: string): Promise<boolean> {
-    return this.oauthTokens.delete(oauthToken);
   }
 }
 

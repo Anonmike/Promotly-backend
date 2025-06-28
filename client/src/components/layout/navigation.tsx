@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { UserButton, useUser } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -36,7 +35,7 @@ export default function Navigation() {
             <Link href="/">
               <div className="flex items-center space-x-2 cursor-pointer">
                 <Share2 className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">Promotly</span>
+                <span className="text-xl font-bold text-gray-900">Social Scheduler</span>
               </div>
             </Link>
           </div>
@@ -76,19 +75,15 @@ export default function Navigation() {
                 3
               </Badge>
             </Button>
+            
+            <Button variant="ghost" size="sm" onClick={() => alert('Settings feature coming soon!')}>
+              <Settings className="h-5 w-5" />
+            </Button>
 
             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
               Service Active
             </Badge>
-
-            <UserButton 
-              appearance={{
-                elements: {
-                  avatarBox: "w-8 h-8"
-                }
-              }}
-            />
           </div>
 
           {/* Mobile Navigation */}

@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { authService } from "./auth";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -7,24 +8,19 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-import { authService } from "./auth";
-
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const token = authService.getToken();
+  
   const headers: Record<string, string> = {};
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  
-  const token = authService.getToken();
-  console.log('API Request - Token check:', { hasToken: !!token, tokenLength: token?.length });
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-  } else {
-    console.warn('No auth token found for API request');
   }
 
   const res = await fetch(url, {
@@ -44,13 +40,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const headers: Record<string, string> = {};
     const token = authService.getToken();
-    console.log('Query Function - Token check:', { hasToken: !!token, tokenLength: token?.length, queryKey: queryKey[0] });
+    
+    const headers: Record<string, string> = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
-    } else {
-      console.warn('No auth token found for query:', queryKey[0]);
     }
     
     const res = await fetch(queryKey[0] as string, {
@@ -59,7 +53,6 @@ export const getQueryFn: <T>(options: {
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      console.log('401 error for query:', queryKey[0]);
       return null;
     }
 

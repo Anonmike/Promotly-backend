@@ -87,7 +87,17 @@ export class SocialMediaService {
 
       // Add media if present
       if (post.mediaUrls && post.mediaUrls.length > 0) {
-        postData.specificContent["com.linkedin.ugc.ShareContent"].shareMediaCategory = "ARTICLE";
+        const mediaUrn = await this.uploadMediaToLinkedIn(post.mediaUrls[0], accessToken);
+        postData.specificContent["com.linkedin.ugc.ShareContent"].media = [{
+          status: "READY",
+          description: {
+            text: "Shared image"
+          },
+          media: mediaUrn,
+          title: {
+            text: "Image"
+          }
+        }];
       }
 
       const response = await axios.post(
@@ -134,25 +144,19 @@ export class SocialMediaService {
   }
 
   // Twitter OAuth Flow
-  async initializeTwitterOAuth(userId: string): Promise<{ authUrl: string; oauthToken: string; oauthTokenSecret: string }> {
+  async initializeTwitterOAuth(): Promise<{ authUrl: string; oauthToken: string; oauthTokenSecret: string }> {
     try {
       const client = new TwitterApi({
         appKey: process.env.TWITTER_CONSUMER_KEY!,
         appSecret: process.env.TWITTER_CONSUMER_SECRET!,
       });
 
-      // Use the production domain for Twitter OAuth callback
-      const callbackUrl = 'https://app.promotlyai.com/api/auth/twitter/callback';
-      
+      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/twitter/callback`;
       console.log('Twitter OAuth callback URL:', callbackUrl);
       
-      // Try with different OAuth settings
       const authLink = await client.generateAuthLink(
         callbackUrl,
-        { 
-          linkMode: 'authorize',
-          forceLogin: false
-        }
+        { linkMode: 'authorize' }
       );
 
       console.log('Twitter OAuth URL generated:', authLink.url);
@@ -164,177 +168,10 @@ export class SocialMediaService {
       };
     } catch (error) {
       console.error('Twitter OAuth initialization error:', error);
-      
-      // Check for specific Twitter API errors
-      if (error && typeof error === 'object' && 'data' in error) {
-        const errorData = (error as any).data;
-        if (typeof errorData === 'string' && errorData.includes('Callback URL not approved')) {
-          throw new Error(`Twitter app configuration error: The callback URL "https://app.promotlyai.com/api/auth/twitter/callback" is not approved in your Twitter app settings. Please add this exact URL to your approved callback URLs list in the Twitter Developer Portal.`);
-        }
-        if (typeof errorData === 'string' && errorData.includes('Invalid consumer key')) {
-          throw new Error('Twitter app configuration error: Invalid consumer key. Please check your TWITTER_CONSUMER_KEY and TWITTER_CONSUMER_SECRET environment variables.');
-        }
-      }
-      
       if (error instanceof Error && error.message.includes('403')) {
-        throw new Error('Twitter app configuration error: 403 Forbidden. This usually means the callback URL needs to be added to your Twitter app settings.');
+        throw new Error('Twitter app configuration error: Please add the callback URL to your Twitter app settings in the Developer Portal');
       }
-      
       throw new Error(`Failed to initialize Twitter OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  async initializeFacebookOAuth(): Promise<{ authUrl: string; state: string }> {
-    try {
-      const clientId = process.env.FACEBOOK_APP_ID;
-      const clientSecret = process.env.FACEBOOK_APP_SECRET;
-      
-      if (!clientId || !clientSecret) {
-        throw new Error('Facebook app credentials not configured');
-      }
-
-      const baseUrl = process.env.REPLIT_DOMAINS 
-        ? 'https://app.promotlyai.com' 
-        : (process.env.BASE_URL || 'http://localhost:5000');
-      const callbackUrl = `${baseUrl}/api/auth/facebook/callback`;
-      const state = Math.random().toString(36).substring(7);
-      
-      const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
-        `client_id=${clientId}&` +
-        `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
-        `scope=pages_manage_posts,pages_read_engagement&` +
-        `state=${state}&` +
-        `response_type=code`;
-
-      console.log('Facebook OAuth URL generated:', authUrl);
-
-      return {
-        authUrl,
-        state,
-      };
-    } catch (error) {
-      console.error('Facebook OAuth initialization error:', error);
-      throw new Error(`Failed to initialize Facebook OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  async completeFacebookOAuth(code: string, state: string): Promise<{ accessToken: string; userId: string; userName: string }> {
-    try {
-      const clientId = process.env.FACEBOOK_APP_ID;
-      const clientSecret = process.env.FACEBOOK_APP_SECRET;
-      const baseUrl = process.env.REPLIT_DOMAINS 
-        ? 'https://app.promotlyai.com' 
-        : (process.env.BASE_URL || 'http://localhost:5000');
-      const callbackUrl = `${baseUrl}/api/auth/facebook/callback`;
-
-      // Exchange code for access token
-      const tokenResponse = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?` +
-        `client_id=${clientId}&` +
-        `client_secret=${clientSecret}&` +
-        `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
-        `code=${code}`);
-
-      const tokenData = await tokenResponse.json();
-      
-      if (!tokenData.access_token) {
-        throw new Error('Failed to obtain access token from Facebook');
-      }
-
-      // Get user info
-      const userResponse = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${tokenData.access_token}&fields=id,name`);
-      const userData = await userResponse.json();
-
-      return {
-        accessToken: tokenData.access_token,
-        userId: userData.id,
-        userName: userData.name,
-      };
-    } catch (error) {
-      console.error('Facebook OAuth completion error:', error);
-      throw new Error(`Failed to complete Facebook OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  async initializeLinkedInOAuth(): Promise<{ authUrl: string; state: string }> {
-    try {
-      const clientId = process.env.LINKEDIN_CLIENT_ID;
-      const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
-      
-      if (!clientId || !clientSecret) {
-        throw new Error('LinkedIn app credentials not configured');
-      }
-
-      const baseUrl = process.env.REPLIT_DOMAINS 
-        ? 'https://app.promotlyai.com' 
-        : (process.env.BASE_URL || 'http://localhost:5000');
-      const callbackUrl = `${baseUrl}/api/auth/linkedin/callback`;
-      const state = Math.random().toString(36).substring(7);
-      
-      const authUrl = `https://www.linkedin.com/oauth/v2/authorization?` +
-        `response_type=code&` +
-        `client_id=${clientId}&` +
-        `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
-        `state=${state}&` +
-        `scope=w_member_social`;
-
-      console.log('LinkedIn OAuth URL generated:', authUrl);
-
-      return {
-        authUrl,
-        state,
-      };
-    } catch (error) {
-      console.error('LinkedIn OAuth initialization error:', error);
-      throw new Error(`Failed to initialize LinkedIn OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  async completeLinkedInOAuth(code: string, state: string): Promise<{ accessToken: string; userId: string; userName: string }> {
-    try {
-      const clientId = process.env.LINKEDIN_CLIENT_ID;
-      const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
-      const baseUrl = process.env.REPLIT_DOMAINS 
-        ? 'https://app.promotlyai.com' 
-        : (process.env.BASE_URL || 'http://localhost:5000');
-      const callbackUrl = `${baseUrl}/api/auth/linkedin/callback`;
-
-      // Exchange code for access token
-      const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: callbackUrl,
-          client_id: clientId!,
-          client_secret: clientSecret!,
-        }),
-      });
-
-      const tokenData = await tokenResponse.json();
-      
-      if (!tokenData.access_token) {
-        throw new Error('Failed to obtain access token from LinkedIn');
-      }
-
-      // Get user info
-      const userResponse = await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`,
-        },
-      });
-      const userData = await userResponse.json();
-
-      return {
-        accessToken: tokenData.access_token,
-        userId: userData.id,
-        userName: `${userData.firstName?.localized?.en_US || ''} ${userData.lastName?.localized?.en_US || ''}`.trim(),
-      };
-    } catch (error) {
-      console.error('LinkedIn OAuth completion error:', error);
-      throw new Error(`Failed to complete LinkedIn OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

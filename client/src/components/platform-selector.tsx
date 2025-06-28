@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,17 +45,8 @@ const platforms = [
 ];
 
 export default function PlatformSelector({ value, onChange }: PlatformSelectorProps) {
-  // Get connected accounts to determine platform availability
-  const { data: accountsData } = useQuery({
-    queryKey: ["/api/social-accounts"],
-  });
-
-  const connectedAccounts = (accountsData as { accounts: any[] })?.accounts || [];
-  const connectedPlatforms = new Set(connectedAccounts.map(account => account.platform));
-
   const togglePlatform = (platformId: string) => {
-    // Only allow selection if platform is connected
-    if (!connectedPlatforms.has(platformId)) return;
+    if (!platforms.find(p => p.id === platformId)?.available) return;
     
     const newValue = value.includes(platformId)
       ? value.filter(id => id !== platformId)
@@ -70,8 +60,7 @@ export default function PlatformSelector({ value, onChange }: PlatformSelectorPr
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {platforms.map((platform) => {
           const isSelected = value.includes(platform.id);
-          const isConnected = connectedPlatforms.has(platform.id);
-          const isDisabled = !isConnected;
+          const isDisabled = !platform.available;
           
           return (
             <Card
@@ -96,13 +85,9 @@ export default function PlatformSelector({ value, onChange }: PlatformSelectorPr
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <h3 className="font-medium text-gray-900">{platform.name}</h3>
-                        {isConnected ? (
-                          <Badge variant="default" className="text-xs bg-green-100 text-green-800">
-                            Connected
-                          </Badge>
-                        ) : (
+                        {!platform.available && (
                           <Badge variant="secondary" className="text-xs">
-                            Not Connected
+                            Limited
                           </Badge>
                         )}
                       </div>
@@ -110,7 +95,7 @@ export default function PlatformSelector({ value, onChange }: PlatformSelectorPr
                     </div>
                   </div>
                   
-                  {isConnected && (
+                  {platform.available && (
                     <div
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
                         isSelected
@@ -144,16 +129,9 @@ export default function PlatformSelector({ value, onChange }: PlatformSelectorPr
         </div>
       )}
 
-      {value.length === 0 && connectedPlatforms.size > 0 && (
+      {value.length === 0 && (
         <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
           Please select at least one platform to publish your post.
-        </p>
-      )}
-
-      {connectedPlatforms.size === 0 && (
-        <p className="text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-          Connect your social media accounts first to start scheduling posts. 
-          <a href="/social-accounts" className="underline ml-1">Go to Social Accounts</a>
         </p>
       )}
     </div>

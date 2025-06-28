@@ -2,72 +2,82 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
-import { insertSocialAccountSchema, insertPostSchema, platformSchema, postStatusSchema } from "@shared/schema";
+import { insertUserSchema, insertSocialAccountSchema, insertPostSchema, platformSchema, postStatusSchema } from "@shared/schema";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { socialMediaService } from "./services/social-media";
 import { scheduler } from "./services/scheduler";
-import { clerkAuth, requireAuth as requireClerkAuth, getUserId } from "./middleware/clerk-auth";
-import { verifyJWT, generateJWT, getJWTUser } from "./middleware/jwt-auth";
+
+const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
+
+// Middleware to verify JWT token
+const authenticateToken = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) {
+      return res.status(403).json({ message: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Clerk authentication routes (sign in/sign up only)
-  app.post("/api/auth/register", clerkAuth, requireClerkAuth, async (req, res) => {
+  // Authentication routes
+  app.post("/api/auth/register", async (req, res) => {
     try {
-      const clerkUserId = getUserId(req);
-      if (!clerkUserId) {
-        return res.status(401).json({ message: "Clerk authentication required" });
-      }
+      const { username, password } = insertUserSchema.parse(req.body);
       
-      const { username } = req.body;
-      if (!username) {
-        return res.status(400).json({ message: "Username is required" });
+      // Check if user exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
       }
 
-      // Create user in our storage with Clerk ID as reference
-      const user = await storage.createUser({ 
-        username, 
-        clerkUserId: clerkUserId 
-      });
-      
-      // Generate JWT for API access
-      const token = generateJWT({ id: user.id, username: user.username });
-      
-      res.json({ user, token });
+      // Hash password and create user
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({ username, password: hashedPassword });
+
+      // Generate JWT token
+      const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET);
+
+      res.json({ token, user: { id: user.id, username: user.username } });
     } catch (error) {
-      res.status(500).json({ message: "Failed to register user" });
+      res.status(400).json({ message: "Invalid input data" });
     }
   });
 
-  app.post("/api/auth/login", clerkAuth, requireClerkAuth, async (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     try {
-      const clerkUserId = getUserId(req);
-      if (!clerkUserId) {
-        return res.status(401).json({ message: "Clerk authentication required" });
-      }
-
-      // Find user by Clerk ID
-      const user = await storage.getUserByClerkId(clerkUserId);
+      const { username, password } = insertUserSchema.parse(req.body);
+      
+      const user = await storage.getUserByUsername(username);
       if (!user) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      // Generate JWT for API access
-      const token = generateJWT({ id: user.id, username: user.username });
-      
-      res.json({ user, token });
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET);
+      res.json({ token, user: { id: user.id, username: user.username } });
     } catch (error) {
-      res.status(500).json({ message: "Failed to login user" });
+      res.status(400).json({ message: "Invalid input data" });
     }
   });
 
-  // All other routes use JWT authentication
   // Social account routes
-  app.get("/api/social-accounts", verifyJWT, async (req, res) => {
+  app.get("/api/social-accounts", authenticateToken, async (req: any, res) => {
     try {
-      const user = getJWTUser(req);
-      if (!user) {
-        return res.status(401).json({ message: "User not authenticated" });
-      }
-      const accounts = await storage.getSocialAccounts(user.id);
+      const accounts = await storage.getSocialAccounts(req.user.userId);
       res.json({ accounts });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch social accounts" });
@@ -84,34 +94,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ sessionId: req.sessionID, hasSession: !!(req as any).session });
   });
 
-  app.post("/api/auth/twitter/init", verifyJWT, async (req, res) => {
+  app.post("/api/auth/twitter/init", authenticateToken, async (req: any, res) => {
     try {
-      const user = getJWTUser(req);
-      if (!user) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
+      const oauthData = await socialMediaService.initializeTwitterOAuth();
       
-      const oauthData = await socialMediaService.initializeTwitterOAuth(user.id.toString());
-      
-      // Store OAuth tokens in database for reliable persistence
-      await storage.createOAuthToken({
-        userId: user.id,
-        platform: "twitter",
+      // Store OAuth tokens temporarily in session
+      (req as any).session.twitterOAuth = {
         oauthToken: oauthData.oauthToken,
         oauthTokenSecret: oauthData.oauthTokenSecret,
-        expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
-      });
+        userId: req.user.userId
+      };
 
-      console.log('Stored OAuth data in database:', {
+      console.log('Stored OAuth data in session:', {
+        sessionId: req.sessionID,
         oauthToken: oauthData.oauthToken,
-        userId: user.id
+        userId: req.user.userId
       });
 
       res.json({ 
         authUrl: oauthData.authUrl,
         oauthToken: oauthData.oauthToken,
-        oauthTokenSecret: oauthData.oauthTokenSecret,
-        message: "OAuth tokens stored in database for reliable completion"
+        message: "For localhost development, you'll need to manually complete the OAuth flow after authorization"
       });
     } catch (error) {
       console.error('Twitter OAuth init error:', error);
@@ -122,78 +125,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Debug endpoint to check stored OAuth tokens
-  app.get("/api/debug/oauth-tokens", async (req, res) => {
-    try {
-      const allTokens = Array.from((storage as any).oauthTokens.entries());
-      res.json({
-        totalTokens: allTokens.length,
-        tokens: allTokens.map(([key, value]) => ({
-          token: key.substring(0, 10) + '...',
-          userId: value.userId,
-          platform: value.platform,
-          expiresAt: value.expiresAt,
-          isExpired: value.expiresAt < new Date(),
-          createdAt: value.createdAt
-        }))
-      });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get debug info' });
-    }
-  });
-
-  // Alternative OAuth completion endpoint that doesn't rely on sessions
-  app.post("/api/auth/twitter/complete", verifyJWT, async (req, res) => {
-    try {
-      const { oauth_token, oauth_verifier, oauth_token_secret } = req.body;
-      const user = getJWTUser(req);
-      
-      if (!user) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-
-      if (!oauth_token || !oauth_verifier || !oauth_token_secret) {
-        return res.status(400).json({ message: "Missing OAuth parameters" });
-      }
-
-      console.log('Manual Twitter OAuth completion for user:', user.id);
-
-      // Complete OAuth flow
-      const result = await socialMediaService.completeTwitterOAuth(
-        oauth_token,
-        oauth_token_secret,
-        oauth_verifier
-      );
-
-      // Store the Twitter account
-      const account = await storage.createSocialAccount({
-        userId: user.id,
-        platform: "twitter",
-        accountId: result.userId,
-        accountName: result.screenName,
-        accessToken: result.accessToken,
-        accessTokenSecret: result.accessTokenSecret,
-      });
-
-      console.log('Twitter account created successfully:', account);
-      res.json({ success: true, account });
-    } catch (error) {
-      console.error('Manual Twitter OAuth completion error:', error);
-      res.status(500).json({ 
-        message: "Failed to complete Twitter authentication",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-
-
-
-
-
-
   // Manual OAuth completion for localhost development
-  app.post("/api/auth/twitter/complete", verifyJWT, async (req, res) => {
+  app.post("/api/auth/twitter/complete", authenticateToken, async (req: any, res) => {
     try {
       const { oauth_verifier } = req.body;
       
@@ -257,56 +190,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/twitter/callback", async (req, res) => {
-    console.log('=== TWITTER CALLBACK RECEIVED ===');
-    console.log('Query params:', req.query);
-    console.log('Session ID:', req.sessionID);
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('==================================');
+    console.log('Twitter callback received:', {
+      query: req.query,
+      headers: req.headers,
+      session: (req as any).session?.twitterOAuth ? 'present' : 'missing',
+      sessionId: req.sessionID
+    });
     
     try {
-      const { oauth_token, oauth_verifier, denied, user_id } = req.query;
+      const { oauth_token, oauth_verifier, denied } = req.query;
       
       // Handle authorization denial
       if (denied) {
         console.log('Twitter authorization denied');
-        return res.redirect("/accounts?error=twitter_auth_denied");
+        return res.redirect("/?error=twitter_auth_denied");
       }
       
       if (!oauth_token || !oauth_verifier) {
         console.log('Missing OAuth parameters:', { oauth_token, oauth_verifier });
-        return res.redirect("/accounts?error=twitter_auth_failed");
+        return res.redirect("/?error=twitter_auth_failed");
       }
 
-      // Retrieve stored OAuth data from database
-      console.log('Looking up OAuth token:', oauth_token);
-      const oauthData = await storage.getOAuthToken(oauth_token as string);
-      console.log('OAuth token lookup result:', {
+      // Retrieve stored OAuth data
+      const oauthData = (req as any).session.twitterOAuth;
+      console.log('Callback session data:', {
+        sessionId: req.sessionID,
+        hasOAuthData: !!oauthData,
+        storedToken: oauthData?.oauthToken,
         receivedToken: oauth_token,
-        foundTokenData: !!oauthData,
-        storedUserId: oauthData?.userId,
-        storedTokenSecret: oauthData?.oauthTokenSecret ? 'present' : 'missing',
-        expiresAt: oauthData?.expiresAt,
-        currentTime: new Date()
+        sessionData: oauthData
       });
       
-      if (!oauthData) {
-        console.log('No OAuth token found in database');
-        return res.redirect("/accounts?error=twitter_session_expired");
+      if (!oauthData || oauthData.oauthToken !== oauth_token) {
+        console.log('OAuth session validation failed');
+        return res.status(400).json({ message: "Invalid OAuth session" });
       }
 
-      // Use userId from stored token data
-      const userId = oauthData.userId;
-      console.log('Using user_id from stored token:', userId);
-
+      // Complete OAuth flow
       const result = await socialMediaService.completeTwitterOAuth(
-        oauth_token as string,
+        oauthData.oauthToken,
         oauthData.oauthTokenSecret,
         oauth_verifier as string
       );
 
       // Store the Twitter account
       await storage.createSocialAccount({
-        userId: userId,
+        userId: oauthData.userId,
         platform: "twitter",
         accountId: result.userId,
         accountName: result.screenName,
@@ -314,48 +243,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         accessTokenSecret: result.accessTokenSecret,
       });
 
-      // Clean up OAuth token from database
-      await storage.deleteOAuthToken(oauth_token as string);
+      // Clear OAuth session data
+      delete (req as any).session.twitterOAuth;
 
-      console.log('Twitter account saved successfully for user:', userId);
       // Redirect back to social accounts page
-      res.redirect("/accounts?connected=twitter");
+      res.redirect("/?connected=twitter");
     } catch (error) {
       console.error('Twitter OAuth callback error:', error);
-      res.redirect("/accounts?error=twitter_auth_failed");
+      res.redirect("/?error=twitter_auth_failed");
     }
   });
 
-  // Get social accounts
-  app.get("/api/accounts", verifyJWT, async (req, res) => {
+  app.post("/api/social-accounts", authenticateToken, async (req: any, res) => {
     try {
-      const user = getJWTUser(req);
-      console.log('Fetching social accounts for user:', user?.id);
-      
-      if (!user) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-      
-      const accounts = await storage.getSocialAccounts(user.id);
-      console.log('Retrieved accounts:', accounts);
-      
-      res.json({ accounts });
-    } catch (error) {
-      console.error('Failed to fetch social accounts:', error);
-      res.status(500).json({ message: "Failed to fetch social accounts" });
-    }
-  });
-
-  app.post("/api/social-accounts", verifyJWT, async (req, res) => {
-    try {
-      const user = getJWTUser(req);
-      if (!user) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-
       const accountData = insertSocialAccountSchema.parse({
         ...req.body,
-        userId: user.id
+        userId: req.user.userId
       });
 
       const account = await storage.createSocialAccount(accountData);
@@ -365,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/social-accounts/:id", verifyJWT, async (req, res) => {
+  app.delete("/api/social-accounts/:id", authenticateToken, async (req: any, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const deleted = await storage.deleteSocialAccount(accountId);
@@ -381,35 +284,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Post routes
-  app.get("/api/posts", verifyJWT, async (req, res) => {
+  app.get("/api/posts", authenticateToken, async (req: any, res) => {
     try {
       const { status, platform, limit } = req.query;
       const filters: any = {};
       
       if (status) filters.status = status;
       if (platform) filters.platform = platform;
-      if (limit) filters.limit = parseInt(String(limit));
+      if (limit) filters.limit = parseInt(limit);
 
-      const user = getJWTUser(req);
-      if (!user) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-      
-      const posts = await storage.getPosts(user.id, filters);
+      const posts = await storage.getPosts(req.user.userId, filters);
       res.json({ posts });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch posts" });
     }
   });
 
-  app.post("/api/posts/schedule", verifyJWT, async (req, res) => {
+  app.post("/api/posts/schedule", authenticateToken, async (req: any, res) => {
     try {
       console.log('Received post data:', req.body);
       
-      const userId = getUserId(req);
       const postData = insertPostSchema.parse({
         ...req.body,
-        userId: userId,
+        userId: req.user.userId,
         status: "scheduled"
       });
 
@@ -441,7 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/posts/:id", verifyJWT, async (req, res) => {
+  app.put("/api/posts/:id", authenticateToken, async (req: any, res) => {
     try {
       const postId = parseInt(req.params.id);
       const updates = req.body;
@@ -462,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/posts/:id", verifyJWT, async (req, res) => {
+  app.delete("/api/posts/:id", authenticateToken, async (req: any, res) => {
     try {
       const postId = parseInt(req.params.id);
       const deleted = await storage.deletePost(postId);
@@ -478,7 +375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get("/api/analytics/:postId", verifyJWT, async (req, res) => {
+  app.get("/api/analytics/:postId", authenticateToken, async (req: any, res) => {
     try {
       const postId = parseInt(req.params.postId);
       const analytics = await storage.getAnalytics(postId);
@@ -488,11 +385,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/user/summary", verifyJWT, async (req, res) => {
+  app.get("/api/analytics/user/summary", authenticateToken, async (req: any, res) => {
     try {
       const { timeframe } = req.query;
-      const userId = getUserId(req);
-      const analytics = await storage.getUserAnalytics(parseInt(userId!), timeframe as string);
+      const analytics = await storage.getUserAnalytics(req.user.userId, timeframe as string);
       
       // Calculate summary statistics
       const summary = {
@@ -522,7 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Social media OAuth callback endpoints (simplified)
-  app.get("/api/auth/:platform/callback", verifyJWT, async (req, res) => {
+  app.get("/api/auth/:platform/callback", authenticateToken, async (req: any, res) => {
     try {
       const { platform } = req.params;
       const { code } = req.query;

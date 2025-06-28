@@ -8,19 +8,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Session configuration
-const isProduction = !!(process.env.REPLIT_DOMAINS || process.env.NODE_ENV === 'production');
 app.use(session({
   secret: process.env.JWT_SECRET || 'your-secret-key',
   resave: false,
-  saveUninitialized: true, // Allow sessions for OAuth flow
+  saveUninitialized: false,
   cookie: {
-    secure: isProduction,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: isProduction ? 'none' : 'lax',
-    httpOnly: false,
-    ...(isProduction && { domain: '.promotlyai.com' })
-  },
-  name: 'promotly.sid' // Custom session name
+    secure: false, // Set to true in production with HTTPS
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
 }));
 
 app.use((req, res, next) => {
@@ -60,11 +55,8 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    console.error('Express error handler:', err);
-    
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
+    res.status(status).json({ message });
+    throw err;
   });
 
   // importantly only setup vite in development and after

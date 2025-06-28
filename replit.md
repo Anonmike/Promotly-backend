@@ -1,4 +1,4 @@
-# Promotly
+# Social Media Scheduler
 
 ## Overview
 
@@ -27,7 +27,7 @@ The application follows a monorepo structure with clear separation between clien
 
 ### Backend Architecture
 - **Express.js API**: RESTful API with middleware for logging and error handling
-- **Clerk Authentication**: Robust user management and authentication system
+- **JWT Authentication**: Token-based authentication system
 - **Drizzle ORM**: Type-safe database operations with PostgreSQL
 - **Social Media Integration**: Services for Twitter, Facebook, and LinkedIn APIs
 - **Scheduler Service**: Cron-based job scheduler for automated posting
@@ -100,11 +100,3 @@ Preferred communication style: Simple, everyday language.
 
 Changelog:
 - June 27, 2025. Initial setup
-- June 28, 2025. Implemented multi-platform OAuth authentication system for Twitter, Facebook, and LinkedIn
-- June 28, 2025. Added comprehensive social media posting support across multiple platforms
-- June 28, 2025. Enhanced platform selector to show connection status and dynamic availability
-- June 28, 2025. Migrated from JWT authentication to Clerk authentication system for robust user management
-- June 28, 2025. Implemented hybrid authentication: Clerk for user sign in/sign up, JWT for all API endpoints to restore scheduling functionality
-- June 28, 2025. Fixed critical bugs: error handling middleware, scheduler service, and callback URLs for deployed domain (https://app.promotlyai.com)
-- June 28, 2025. Rebranded application from "Social Media Scheduler" to "Promotly" throughout the codebase including UI, navigation, local storage keys, and HTML metadata
-- June 28, 2025. Fixed session expiration issues during OAuth callbacks by implementing dual approach: improved session configuration for production deployment and session-less OAuth completion fallback method
