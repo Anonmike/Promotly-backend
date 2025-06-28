@@ -13,9 +13,12 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Set to true in production with HTTPS
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+    secure: process.env.REPLIT_DOMAINS ? true : false, // Use HTTPS in production
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax',
+    httpOnly: true
+  },
+  name: 'promotly.sid' // Custom session name
 }));
 
 app.use((req, res, next) => {

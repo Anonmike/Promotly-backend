@@ -42,6 +42,20 @@ export default function SocialAccounts() {
         variant: "destructive",
       });
       window.history.replaceState({}, '', window.location.pathname);
+    } else if (error === 'twitter_session_expired') {
+      toast({
+        title: "Session Expired",
+        description: "Your authentication session expired. Please try connecting again.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (error === 'twitter_auth_denied') {
+      toast({
+        title: "Authorization Denied",
+        description: "Twitter authorization was cancelled.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [toast]);
 

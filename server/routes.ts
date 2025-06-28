@@ -86,20 +86,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/twitter/init", verifyJWT, async (req, res) => {
     try {
-      const oauthData = await socialMediaService.initializeTwitterOAuth();
+      const user = getJWTUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const oauthData = await socialMediaService.initializeTwitterOAuth(user.id.toString());
       
       // Store OAuth tokens temporarily in session
-      const userId = getUserId(req);
       (req as any).session.twitterOAuth = {
         oauthToken: oauthData.oauthToken,
         oauthTokenSecret: oauthData.oauthTokenSecret,
-        userId: userId
+        userId: user.id
       };
 
       console.log('Stored OAuth data in session:', {
         sessionId: req.sessionID,
         oauthToken: oauthData.oauthToken,
-        userId: userId
+        userId: user.id
       });
 
       res.json({ 
@@ -361,44 +365,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     try {
-      const { oauth_token, oauth_verifier, denied } = req.query;
+      const { oauth_token, oauth_verifier, denied, user_id } = req.query;
       
       // Handle authorization denial
       if (denied) {
         console.log('Twitter authorization denied');
-        return res.redirect("/?error=twitter_auth_denied");
+        return res.redirect("/accounts?error=twitter_auth_denied");
       }
       
       if (!oauth_token || !oauth_verifier) {
         console.log('Missing OAuth parameters:', { oauth_token, oauth_verifier });
-        return res.redirect("/?error=twitter_auth_failed");
+        return res.redirect("/accounts?error=twitter_auth_failed");
       }
 
-      // Retrieve stored OAuth data
+      // Retrieve stored OAuth data from session
       const oauthData = (req as any).session.twitterOAuth;
       console.log('Callback session data:', {
         sessionId: req.sessionID,
         hasOAuthData: !!oauthData,
         storedToken: oauthData?.oauthToken,
         receivedToken: oauth_token,
+        userIdFromUrl: user_id,
         sessionData: oauthData
       });
       
-      if (!oauthData || oauthData.oauthToken !== oauth_token) {
-        console.log('OAuth session validation failed');
-        return res.status(400).json({ message: "Invalid OAuth session" });
+      // If session data is missing but we have user_id in URL, try to complete OAuth anyway
+      let userId = oauthData?.userId;
+      if (!userId && user_id) {
+        userId = parseInt(user_id as string);
+        console.log('Using user_id from URL parameters:', userId);
+      }
+      
+      if (!userId) {
+        console.log('No user ID available from session or URL');
+        return res.redirect("/accounts?error=twitter_auth_failed");
       }
 
-      // Complete OAuth flow
+      // For session validation, we'll be more lenient if we have the user_id from URL
+      if (oauthData && oauthData.oauthToken !== oauth_token) {
+        console.log('OAuth token mismatch in session');
+        return res.redirect("/accounts?error=twitter_auth_failed");
+      }
+
+      // Complete OAuth flow - we need the token secret from session
+      if (!oauthData?.oauthTokenSecret) {
+        console.log('Missing OAuth token secret from session');
+        return res.redirect("/accounts?error=twitter_session_expired");
+      }
+
       const result = await socialMediaService.completeTwitterOAuth(
-        oauthData.oauthToken,
+        oauth_token as string,
         oauthData.oauthTokenSecret,
         oauth_verifier as string
       );
 
       // Store the Twitter account
       await storage.createSocialAccount({
-        userId: oauthData.userId,
+        userId: userId,
         platform: "twitter",
         accountId: result.userId,
         accountName: result.screenName,
@@ -407,13 +430,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Clear OAuth session data
-      delete (req as any).session.twitterOAuth;
+      if ((req as any).session.twitterOAuth) {
+        delete (req as any).session.twitterOAuth;
+      }
 
+      console.log('Twitter account saved successfully for user:', userId);
       // Redirect back to social accounts page
-      res.redirect("/?connected=twitter");
+      res.redirect("/accounts?connected=twitter");
     } catch (error) {
       console.error('Twitter OAuth callback error:', error);
-      res.redirect("/?error=twitter_auth_failed");
+      res.redirect("/accounts?error=twitter_auth_failed");
     }
   });
 

@@ -134,7 +134,7 @@ export class SocialMediaService {
   }
 
   // Twitter OAuth Flow
-  async initializeTwitterOAuth(): Promise<{ authUrl: string; oauthToken: string; oauthTokenSecret: string }> {
+  async initializeTwitterOAuth(userId: string): Promise<{ authUrl: string; oauthToken: string; oauthTokenSecret: string }> {
     try {
       const client = new TwitterApi({
         appKey: process.env.TWITTER_CONSUMER_KEY!,
@@ -144,7 +144,7 @@ export class SocialMediaService {
       const baseUrl = process.env.REPLIT_DOMAINS 
         ? 'https://app.promotlyai.com' 
         : (process.env.BASE_URL || 'http://localhost:5000');
-      const callbackUrl = `${baseUrl}/api/auth/twitter/callback`;
+      const callbackUrl = `${baseUrl}/api/auth/twitter/callback?user_id=${userId}`;
       console.log('Twitter OAuth callback URL:', callbackUrl);
       
       const authLink = await client.generateAuthLink(
