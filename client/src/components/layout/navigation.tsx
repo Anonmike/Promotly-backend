@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
+import { useNotifications } from "@/hooks/use-notifications";
 import { 
   Home, 
   Calendar, 
@@ -18,6 +19,7 @@ import promotlyLogo from "@/assets/promotly-logo.png";
 export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { notificationCount, failedPosts, recentSuccessfulPosts } = useNotifications();
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: Home },
@@ -68,24 +70,36 @@ export default function Navigation() {
           {/* Right Side Actions */}
           <div className="flex items-center space-x-4">
             <SignedIn>
-              <Button variant="ghost" size="sm" className="relative" onClick={() => alert('Notifications feature coming soon!')}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="relative" 
+                onClick={() => {
+                  if (failedPosts > 0) {
+                    alert(`${failedPosts} post(s) failed to publish. Check your Posts page for details.`);
+                  } else if (recentSuccessfulPosts > 0) {
+                    alert(`${recentSuccessfulPosts} post(s) successfully published in the last 24 hours.`);
+                  } else {
+                    alert('No recent notifications');
+                  }
+                }}
+              >
                 <Bell className="h-5 w-5" />
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs flex items-center justify-center"
-                >
-                  3
-                </Badge>
+                {notificationCount > 0 && (
+                  <Badge 
+                    variant={failedPosts > 0 ? "destructive" : "default"}
+                    className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs flex items-center justify-center"
+                  >
+                    {notificationCount}
+                  </Badge>
+                )}
               </Button>
               
               <Button variant="ghost" size="sm" onClick={() => alert('Settings feature coming soon!')}>
                 <Settings className="h-5 w-5" />
               </Button>
 
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                Service Active
-              </Badge>
+
 
               <UserButton afterSignOutUrl="/" />
             </SignedIn>

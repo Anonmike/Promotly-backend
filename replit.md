@@ -127,6 +127,14 @@ Preferred communication style: Simple, everyday language.
   - Users now sign in with Clerk but social account connections remain unchanged
   - All API routes now use Clerk authentication while maintaining social posting features
 
+- **June 28, 2025**: Implemented functional notification system
+  - Removed "Service Active" indicator from navigation header
+  - Created real-time notification system for post-related events
+  - Added toast notifications for successful post publishing, failures, and scheduling
+  - Implemented notification bell with dynamic badge showing failed posts and recent successes
+  - Created notification hook that polls for post status changes every 10 seconds
+  - Users receive immediate feedback for all post operations with descriptive messages
+
 ## Changelog
 
 - June 27, 2025: Initial setup

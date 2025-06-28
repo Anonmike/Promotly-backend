@@ -13,6 +13,7 @@ import Posts from "@/pages/posts";
 import Analytics from "@/pages/analytics";
 import SocialAccounts from "@/pages/social-accounts";
 import Navigation from "@/components/layout/navigation";
+import { useNotifications } from "@/hooks/use-notifications";
 
 function Router() {
   return (
