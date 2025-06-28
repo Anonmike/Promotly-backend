@@ -27,7 +27,7 @@ The application follows a monorepo structure with clear separation between clien
 
 ### Backend Architecture
 - **Express.js API**: RESTful API with middleware for logging and error handling
-- **JWT Authentication**: Token-based authentication system
+- **Clerk Authentication**: Robust user management and authentication system
 - **Drizzle ORM**: Type-safe database operations with PostgreSQL
 - **Social Media Integration**: Services for Twitter, Facebook, and LinkedIn APIs
 - **Scheduler Service**: Cron-based job scheduler for automated posting
@@ -103,3 +103,4 @@ Changelog:
 - June 28, 2025. Implemented multi-platform OAuth authentication system for Twitter, Facebook, and LinkedIn
 - June 28, 2025. Added comprehensive social media posting support across multiple platforms
 - June 28, 2025. Enhanced platform selector to show connection status and dynamic availability
+- June 28, 2025. Migrated from JWT authentication to Clerk authentication system for robust user management

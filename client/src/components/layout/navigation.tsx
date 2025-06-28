@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { UserButton, useUser } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -75,15 +76,19 @@ export default function Navigation() {
                 3
               </Badge>
             </Button>
-            
-            <Button variant="ghost" size="sm" onClick={() => alert('Settings feature coming soon!')}>
-              <Settings className="h-5 w-5" />
-            </Button>
 
             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
               Service Active
             </Badge>
+
+            <UserButton 
+              appearance={{
+                elements: {
+                  avatarBox: "w-8 h-8"
+                }
+              }}
+            />
           </div>
 
           {/* Mobile Navigation */}

@@ -1,5 +1,4 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { authService } from "./auth";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -8,19 +7,24 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Global auth token storage for Clerk
+let clerkToken: string | null = null;
+
+export function setClerkToken(token: string | null) {
+  clerkToken = token;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const token = authService.getToken();
-  
   const headers: Record<string, string> = {};
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  if (clerkToken) {
+    headers["Authorization"] = `Bearer ${clerkToken}`;
   }
 
   const res = await fetch(url, {
@@ -40,11 +44,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const token = authService.getToken();
-    
     const headers: Record<string, string> = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (clerkToken) {
+      headers["Authorization"] = `Bearer ${clerkToken}`;
     }
     
     const res = await fetch(queryKey[0] as string, {
