@@ -495,10 +495,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get social accounts
   app.get("/api/accounts", verifyJWT, async (req, res) => {
     try {
-      const userId = getUserId(req);
-      console.log('Fetching social accounts for user:', userId);
+      const user = getJWTUser(req);
+      console.log('Fetching social accounts for user:', user?.id);
       
-      const accounts = await storage.getSocialAccounts(parseInt(userId!));
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const accounts = await storage.getSocialAccounts(user.id);
       console.log('Retrieved accounts:', accounts);
       
       res.json({ accounts });
@@ -510,10 +514,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/social-accounts", verifyJWT, async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const user = getJWTUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
       const accountData = insertSocialAccountSchema.parse({
         ...req.body,
-        userId: userId
+        userId: user.id
       });
 
       const account = await storage.createSocialAccount(accountData);
@@ -548,8 +556,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (platform) filters.platform = platform;
       if (limit) filters.limit = parseInt(String(limit));
 
-      const userId = getUserId(req);
-      const posts = await storage.getPosts(parseInt(userId!), filters);
+      const user = getJWTUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const posts = await storage.getPosts(user.id, filters);
       res.json({ posts });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch posts" });
