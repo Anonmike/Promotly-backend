@@ -21,6 +21,7 @@ export default function SocialAccounts() {
   const { toast } = useToast();
   const [showOAuthComplete, setShowOAuthComplete] = useState(false);
   const [oauthVerifier, setOauthVerifier] = useState("");
+  const [oauthData, setOauthData] = useState<any>(null);
 
   // Check for connection success/error messages in URL
   useEffect(() => {
@@ -92,7 +93,8 @@ export default function SocialAccounts() {
       return response.json();
     },
     onSuccess: (data) => {
-      // Show manual completion interface for localhost development
+      // Store OAuth data for session-less completion
+      setOauthData(data);
       setShowOAuthComplete(true);
       toast({
         title: "Twitter Authorization Required",
@@ -119,9 +121,10 @@ export default function SocialAccounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
       setShowOAuthComplete(false);
       setOauthVerifier("");
+      setOauthData(null);
       toast({
         title: "Success!",
-        description: data.message,
+        description: `${data.account?.platform} account connected successfully as ${data.account?.accountName}`,
       });
     },
     onError: (error) => {
@@ -333,10 +336,14 @@ export default function SocialAccounts() {
                   <div className="flex space-x-2">
                     <Button
                       onClick={() => {
-                        if (currentPlatform === "twitter") {
+                        if (currentPlatform === "twitter" && oauthData) {
                           completeOAuthMutation.mutate({ 
                             platform: "twitter", 
-                            data: { oauth_verifier: oauthVerifier }
+                            data: { 
+                              oauth_token: oauthData.oauthToken,
+                              oauth_verifier: oauthVerifier,
+                              oauth_token_secret: oauthData.oauthTokenSecret
+                            }
                           });
                         } else {
                           // For Facebook and LinkedIn, we need both code and state
@@ -360,6 +367,7 @@ export default function SocialAccounts() {
                       onClick={() => {
                         setShowOAuthComplete(false);
                         setOauthVerifier("");
+                        setOauthData(null);
                       }}
                       disabled={completeOAuthMutation.isPending}
                     >

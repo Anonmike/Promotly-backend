@@ -109,13 +109,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         authUrl: oauthData.authUrl,
         oauthToken: oauthData.oauthToken,
-        message: "For localhost development, you'll need to manually complete the OAuth flow after authorization"
+        oauthTokenSecret: oauthData.oauthTokenSecret,
+        message: "OAuth tokens provided for session-less completion"
       });
     } catch (error) {
       console.error('Twitter OAuth init error:', error);
       res.status(500).json({ 
         message: "Failed to initialize Twitter OAuth",
         error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Alternative OAuth completion endpoint that doesn't rely on sessions
+  app.post("/api/auth/twitter/complete", verifyJWT, async (req, res) => {
+    try {
+      const { oauth_token, oauth_verifier, oauth_token_secret } = req.body;
+      const user = getJWTUser(req);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      if (!oauth_token || !oauth_verifier || !oauth_token_secret) {
+        return res.status(400).json({ message: "Missing OAuth parameters" });
+      }
+
+      console.log('Manual Twitter OAuth completion for user:', user.id);
+
+      // Complete OAuth flow
+      const result = await socialMediaService.completeTwitterOAuth(
+        oauth_token,
+        oauth_token_secret,
+        oauth_verifier
+      );
+
+      // Store the Twitter account
+      const account = await storage.createSocialAccount({
+        userId: user.id,
+        platform: "twitter",
+        accountId: result.userId,
+        accountName: result.screenName,
+        accessToken: result.accessToken,
+        accessTokenSecret: result.accessTokenSecret,
+      });
+
+      console.log('Twitter account created successfully:', account);
+      res.json({ success: true, account });
+    } catch (error) {
+      console.error('Manual Twitter OAuth completion error:', error);
+      res.status(500).json({ 
+        message: "Failed to complete Twitter authentication",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });

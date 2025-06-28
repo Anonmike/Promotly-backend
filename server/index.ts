@@ -8,15 +8,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Session configuration
+const isProduction = !!(process.env.REPLIT_DOMAINS || process.env.NODE_ENV === 'production');
 app.use(session({
   secret: process.env.JWT_SECRET || 'your-secret-key',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true, // Allow sessions for OAuth flow
   cookie: {
-    secure: process.env.REPLIT_DOMAINS ? true : false, // Use HTTPS in production
+    secure: isProduction,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax',
-    httpOnly: true
+    sameSite: isProduction ? 'none' : 'lax',
+    httpOnly: false,
+    ...(isProduction && { domain: '.promotlyai.com' })
   },
   name: 'promotly.sid' // Custom session name
 }));

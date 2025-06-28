@@ -107,3 +107,4 @@ Changelog:
 - June 28, 2025. Implemented hybrid authentication: Clerk for user sign in/sign up, JWT for all API endpoints to restore scheduling functionality
 - June 28, 2025. Fixed critical bugs: error handling middleware, scheduler service, and callback URLs for deployed domain (https://app.promotlyai.com)
 - June 28, 2025. Rebranded application from "Social Media Scheduler" to "Promotly" throughout the codebase including UI, navigation, local storage keys, and HTML metadata
+- June 28, 2025. Fixed session expiration issues during OAuth callbacks by implementing dual approach: improved session configuration for production deployment and session-less OAuth completion fallback method
