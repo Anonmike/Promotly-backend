@@ -1,11 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
+import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink, Copy } from "lucide-react";
 
 interface SocialAccount {
   id: number;
@@ -17,6 +19,8 @@ interface SocialAccount {
 
 export default function SocialAccounts() {
   const { toast } = useToast();
+  const [showOAuthComplete, setShowOAuthComplete] = useState(false);
+  const [oauthVerifier, setOauthVerifier] = useState("");
 
   // Check for connection success/error messages in URL
   useEffect(() => {
@@ -74,13 +78,44 @@ export default function SocialAccounts() {
       return response.json();
     },
     onSuccess: (data) => {
-      // Redirect user to Twitter authorization
-      window.location.href = data.authUrl;
+      // Show manual completion interface for localhost development
+      setShowOAuthComplete(true);
+      toast({
+        title: "Twitter Authorization Required",
+        description: "Click the authorization link, then return here to complete the connection.",
+      });
+      // Open Twitter authorization in new tab
+      window.open(data.authUrl, '_blank');
     },
     onError: (error) => {
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to initialize Twitter authorization",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const completeOAuthMutation = useMutation({
+    mutationFn: async (verifier: string) => {
+      const response = await apiRequest("POST", "/api/auth/twitter/complete", {
+        oauth_verifier: verifier
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      setShowOAuthComplete(false);
+      setOauthVerifier("");
+      toast({
+        title: "Success!",
+        description: data.message,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to complete Twitter authorization",
         variant: "destructive",
       });
     },
@@ -172,7 +207,7 @@ export default function SocialAccounts() {
                 ) : (
                   <Button 
                     onClick={handleConnectTwitter}
-                    disabled={twitterOAuthMutation.isPending}
+                    disabled={twitterOAuthMutation.isPending || showOAuthComplete}
                     className="flex items-center space-x-2"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -181,6 +216,62 @@ export default function SocialAccounts() {
                 )}
               </div>
             </div>
+
+            {/* Manual OAuth Completion - Show only when needed */}
+            {showOAuthComplete && (
+              <Card className="border-blue-200 bg-blue-50">
+                <CardHeader>
+                  <CardTitle className="text-blue-900">Complete Twitter Authorization</CardTitle>
+                  <CardDescription className="text-blue-700">
+                    After authorizing our app on Twitter, copy the verification code from the URL and paste it below.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 bg-blue-100 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">Instructions:</h4>
+                    <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
+                      <li>Click "Authorize app" on the Twitter page that opened</li>
+                      <li>Look for a verification code in the URL or on the page</li>
+                      <li>Copy the code and paste it below</li>
+                      <li>Click "Complete Connection"</li>
+                    </ol>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="oauth-verifier" className="text-blue-900">
+                      Verification Code
+                    </Label>
+                    <Input
+                      id="oauth-verifier"
+                      value={oauthVerifier}
+                      onChange={(e) => setOauthVerifier(e.target.value)}
+                      placeholder="Enter the verification code from Twitter"
+                      className="border-blue-300"
+                    />
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={() => completeOAuthMutation.mutate(oauthVerifier)}
+                      disabled={!oauthVerifier.trim() || completeOAuthMutation.isPending}
+                      className="flex-1"
+                    >
+                      {completeOAuthMutation.isPending ? "Connecting..." : "Complete Connection"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowOAuthComplete(false);
+                        setOauthVerifier("");
+                      }}
+                      disabled={completeOAuthMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Facebook - Coming Soon */}
             <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">

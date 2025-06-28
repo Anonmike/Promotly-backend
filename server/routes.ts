@@ -85,6 +85,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Twitter OAuth routes
+  // Test endpoint to verify session persistence
+  app.get("/api/test/session", (req, res) => {
+    console.log('Session test:', {
+      sessionId: req.sessionID,
+      session: (req as any).session
+    });
+    res.json({ sessionId: req.sessionID, hasSession: !!(req as any).session });
+  });
+
   app.post("/api/auth/twitter/init", authenticateToken, async (req: any, res) => {
     try {
       const oauthData = await socialMediaService.initializeTwitterOAuth();
@@ -96,7 +105,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.user.userId
       };
 
-      res.json({ authUrl: oauthData.authUrl });
+      console.log('Stored OAuth data in session:', {
+        sessionId: req.sessionID,
+        oauthToken: oauthData.oauthToken,
+        userId: req.user.userId
+      });
+
+      res.json({ 
+        authUrl: oauthData.authUrl,
+        oauthToken: oauthData.oauthToken,
+        message: "For localhost development, you'll need to manually complete the OAuth flow after authorization"
+      });
     } catch (error) {
       console.error('Twitter OAuth init error:', error);
       res.status(500).json({ 
@@ -106,23 +125,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/auth/twitter/callback", async (req, res) => {
-    console.log('Twitter callback received:', {
-      query: req.query,
-      session: (req as any).session?.twitterOAuth ? 'present' : 'missing'
-    });
-    
+  // Manual OAuth completion for localhost development
+  app.post("/api/auth/twitter/complete", authenticateToken, async (req: any, res) => {
     try {
-      const { oauth_token, oauth_verifier } = req.query;
+      const { oauth_verifier } = req.body;
       
-      if (!oauth_token || !oauth_verifier) {
-        console.log('Missing OAuth parameters:', { oauth_token, oauth_verifier });
-        return res.status(400).json({ message: "Missing OAuth parameters" });
+      if (!oauth_verifier) {
+        return res.status(400).json({ message: "OAuth verifier required" });
       }
 
       // Retrieve stored OAuth data
       const oauthData = (req as any).session.twitterOAuth;
+      if (!oauthData) {
+        return res.status(400).json({ message: "No OAuth session found. Please reinitialize Twitter OAuth." });
+      }
+
+      console.log('Manual OAuth completion:', {
+        sessionId: req.sessionID,
+        hasOAuthData: !!oauthData,
+        verifier: oauth_verifier
+      });
+
+      // Complete OAuth flow
+      const result = await socialMediaService.completeTwitterOAuth(
+        oauthData.oauthToken,
+        oauthData.oauthTokenSecret,
+        oauth_verifier
+      );
+
+      // Store the Twitter account
+      await storage.createSocialAccount({
+        userId: oauthData.userId,
+        platform: "twitter",
+        accountId: result.userId,
+        accountName: result.screenName,
+        accessToken: result.accessToken,
+        accessTokenSecret: result.accessTokenSecret,
+      });
+
+      // Clear OAuth session data
+      delete (req as any).session.twitterOAuth;
+
+      res.json({ 
+        success: true, 
+        message: `Twitter account @${result.screenName} connected successfully!`,
+        account: {
+          platform: "twitter",
+          accountName: result.screenName
+        }
+      });
+    } catch (error) {
+      console.error('Manual Twitter OAuth completion error:', error);
+      res.status(500).json({ 
+        message: "Failed to complete Twitter OAuth",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Simple test callback to verify Twitter can reach our server
+  app.get("/api/auth/twitter/test", (req, res) => {
+    console.log('Twitter test callback received:', req.query);
+    res.send('Twitter callback test successful!');
+  });
+
+  app.get("/api/auth/twitter/callback", async (req, res) => {
+    console.log('Twitter callback received:', {
+      query: req.query,
+      headers: req.headers,
+      session: (req as any).session?.twitterOAuth ? 'present' : 'missing',
+      sessionId: req.sessionID
+    });
+    
+    try {
+      const { oauth_token, oauth_verifier, denied } = req.query;
+      
+      // Handle authorization denial
+      if (denied) {
+        console.log('Twitter authorization denied');
+        return res.redirect("/?error=twitter_auth_denied");
+      }
+      
+      if (!oauth_token || !oauth_verifier) {
+        console.log('Missing OAuth parameters:', { oauth_token, oauth_verifier });
+        return res.redirect("/?error=twitter_auth_failed");
+      }
+
+      // Retrieve stored OAuth data
+      const oauthData = (req as any).session.twitterOAuth;
+      console.log('Callback session data:', {
+        sessionId: req.sessionID,
+        hasOAuthData: !!oauthData,
+        storedToken: oauthData?.oauthToken,
+        receivedToken: oauth_token,
+        sessionData: oauthData
+      });
+      
       if (!oauthData || oauthData.oauthToken !== oauth_token) {
+        console.log('OAuth session validation failed');
         return res.status(400).json({ message: "Invalid OAuth session" });
       }
 
