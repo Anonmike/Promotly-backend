@@ -36,7 +36,7 @@ export default function Navigation() {
             <Link href="/">
               <div className="flex items-center space-x-2 cursor-pointer">
                 <Share2 className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">Social Scheduler</span>
+                <span className="text-xl font-bold text-gray-900">Promotly</span>
               </div>
             </Link>
           </div>

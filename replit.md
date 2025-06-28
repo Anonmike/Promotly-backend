@@ -1,4 +1,4 @@
-# Social Media Scheduler
+# Promotly
 
 ## Overview
 
@@ -106,3 +106,4 @@ Changelog:
 - June 28, 2025. Migrated from JWT authentication to Clerk authentication system for robust user management
 - June 28, 2025. Implemented hybrid authentication: Clerk for user sign in/sign up, JWT for all API endpoints to restore scheduling functionality
 - June 28, 2025. Fixed critical bugs: error handling middleware, scheduler service, and callback URLs for deployed domain (https://app.promotlyai.com)
+- June 28, 2025. Rebranded application from "Social Media Scheduler" to "Promotly" throughout the codebase including UI, navigation, local storage keys, and HTML metadata

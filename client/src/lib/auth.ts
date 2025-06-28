@@ -1,6 +1,6 @@
 // Simple authentication management
-const AUTH_TOKEN_KEY = 'social_scheduler_token';
-const AUTH_USER_KEY = 'social_scheduler_user';
+const AUTH_TOKEN_KEY = 'promotly_token';
+const AUTH_USER_KEY = 'promotly_user';
 
 export interface User {
   id: number;

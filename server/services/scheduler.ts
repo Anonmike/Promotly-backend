@@ -18,7 +18,7 @@ export class SchedulerService {
     });
 
     this.isSchedulerRunning = true;
-    console.log("Social media scheduler started");
+    console.log("Promotly scheduler started");
   }
 
   stop() {
@@ -27,7 +27,7 @@ export class SchedulerService {
       this.cronJob = null;
     }
     this.isSchedulerRunning = false;
-    console.log("Social media scheduler stopped");
+    console.log("Promotly scheduler stopped");
   }
 
   isRunning(): boolean {

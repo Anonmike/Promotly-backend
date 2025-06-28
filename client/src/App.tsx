@@ -22,7 +22,7 @@ function AuthPage() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Social Media Scheduler
+            Promotly
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             {isSignUp ? "Create your account" : "Sign in to your account"}
@@ -95,8 +95,8 @@ function AuthenticatedApp() {
 
           if (response.ok) {
             const data = await response.json();
-            localStorage.setItem('social_scheduler_token', data.token);
-            localStorage.setItem('social_scheduler_user', JSON.stringify(data.user));
+            localStorage.setItem('promotly_token', data.token);
+            localStorage.setItem('promotly_user', JSON.stringify(data.user));
             setIsJWTReady(true);
           } else {
             // Try login if register fails
@@ -108,8 +108,8 @@ function AuthenticatedApp() {
             
             if (loginResponse.ok) {
               const data = await loginResponse.json();
-              localStorage.setItem('social_scheduler_token', data.token);
-              localStorage.setItem('social_scheduler_user', JSON.stringify(data.user));
+              localStorage.setItem('promotly_token', data.token);
+              localStorage.setItem('promotly_user', JSON.stringify(data.user));
               setIsJWTReady(true);
             }
           }
