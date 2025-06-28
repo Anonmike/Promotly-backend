@@ -142,7 +142,7 @@ export class SocialMediaService {
       });
 
       const baseUrl = process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS}` 
+        ? 'https://app.promotlyai.com' 
         : (process.env.BASE_URL || 'http://localhost:5000');
       const callbackUrl = `${baseUrl}/api/auth/twitter/callback`;
       console.log('Twitter OAuth callback URL:', callbackUrl);
@@ -178,7 +178,7 @@ export class SocialMediaService {
       }
 
       const baseUrl = process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS}` 
+        ? 'https://app.promotlyai.com' 
         : (process.env.BASE_URL || 'http://localhost:5000');
       const callbackUrl = `${baseUrl}/api/auth/facebook/callback`;
       const state = Math.random().toString(36).substring(7);
@@ -207,7 +207,7 @@ export class SocialMediaService {
       const clientId = process.env.FACEBOOK_APP_ID;
       const clientSecret = process.env.FACEBOOK_APP_SECRET;
       const baseUrl = process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS}` 
+        ? 'https://app.promotlyai.com' 
         : (process.env.BASE_URL || 'http://localhost:5000');
       const callbackUrl = `${baseUrl}/api/auth/facebook/callback`;
 
@@ -249,7 +249,7 @@ export class SocialMediaService {
       }
 
       const baseUrl = process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS}` 
+        ? 'https://app.promotlyai.com' 
         : (process.env.BASE_URL || 'http://localhost:5000');
       const callbackUrl = `${baseUrl}/api/auth/linkedin/callback`;
       const state = Math.random().toString(36).substring(7);
@@ -278,7 +278,7 @@ export class SocialMediaService {
       const clientId = process.env.LINKEDIN_CLIENT_ID;
       const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
       const baseUrl = process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS}` 
+        ? 'https://app.promotlyai.com' 
         : (process.env.BASE_URL || 'http://localhost:5000');
       const callbackUrl = `${baseUrl}/api/auth/linkedin/callback`;
 
