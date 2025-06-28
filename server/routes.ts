@@ -493,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get social accounts
-  app.get("/api/social-accounts", verifyJWT, async (req, res) => {
+  app.get("/api/accounts", verifyJWT, async (req, res) => {
     try {
       const userId = getUserId(req);
       console.log('Fetching social accounts for user:', userId);

@@ -29,21 +29,21 @@ export default function SocialAccounts() {
         title: "Success!",
         description: "Twitter account connected successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       window.history.replaceState({}, '', window.location.pathname);
     } else if (connected === 'facebook') {
       toast({
         title: "Success!",
         description: "Facebook account connected successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       window.history.replaceState({}, '', window.location.pathname);
     } else if (connected === 'linkedin') {
       toast({
         title: "Success!",
         description: "LinkedIn account connected successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       window.history.replaceState({}, '', window.location.pathname);
     } else if (error === 'twitter_auth_failed') {
       toast({
@@ -70,7 +70,7 @@ export default function SocialAccounts() {
   }, [toast]);
 
   const { data: accountsData, isLoading } = useQuery({
-    queryKey: ["/api/social-accounts"],
+    queryKey: ["/api/accounts"],
   });
 
   const accounts = (accountsData as { accounts: SocialAccount[] })?.accounts || [];
@@ -81,7 +81,7 @@ export default function SocialAccounts() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       toast({
         title: "Account removed",
         description: "Social media account has been disconnected successfully.",

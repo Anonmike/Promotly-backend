@@ -15,7 +15,7 @@ export default function Dashboard() {
   });
 
   const { data: accountsData, isLoading: accountsLoading } = useQuery({
-    queryKey: ["/api/social-accounts"],
+    queryKey: ["/api/accounts"],
   });
 
   if (postsLoading || analyticsLoading || accountsLoading) {
