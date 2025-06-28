@@ -141,15 +141,19 @@ export class SocialMediaService {
         appSecret: process.env.TWITTER_CONSUMER_SECRET!,
       });
 
-      const baseUrl = process.env.REPLIT_DOMAINS 
-        ? 'https://app.promotlyai.com' 
-        : (process.env.BASE_URL || 'http://localhost:5000');
-      const callbackUrl = `${baseUrl}/api/auth/twitter/callback`;
-      console.log('Twitter OAuth callback URL (clean):', callbackUrl);
+      // For now, use a simple callback URL that Twitter can approve
+      const callbackUrl = 'http://127.0.0.1:5000/api/auth/twitter/callback';
       
+      console.log('Twitter OAuth callback URL (localhost):', callbackUrl);
+      console.log('Note: Using localhost callback for testing - this must be added to Twitter app settings');
+      
+      // Try with different OAuth settings
       const authLink = await client.generateAuthLink(
         callbackUrl,
-        { linkMode: 'authorize' }
+        { 
+          linkMode: 'authorize',
+          forceLogin: false
+        }
       );
 
       console.log('Twitter OAuth URL generated:', authLink.url);
@@ -161,9 +165,22 @@ export class SocialMediaService {
       };
     } catch (error) {
       console.error('Twitter OAuth initialization error:', error);
-      if (error instanceof Error && error.message.includes('403')) {
-        throw new Error('Twitter app configuration error: Please add the callback URL to your Twitter app settings in the Developer Portal');
+      
+      // Check for specific Twitter API errors
+      if (error && typeof error === 'object' && 'data' in error) {
+        const errorData = (error as any).data;
+        if (typeof errorData === 'string' && errorData.includes('Callback URL not approved')) {
+          throw new Error(`Twitter app configuration error: The callback URL "http://127.0.0.1:5000/api/auth/twitter/callback" is not approved in your Twitter app settings. Please add this exact URL to your approved callback URLs list in the Twitter Developer Portal.`);
+        }
+        if (typeof errorData === 'string' && errorData.includes('Invalid consumer key')) {
+          throw new Error('Twitter app configuration error: Invalid consumer key. Please check your TWITTER_CONSUMER_KEY and TWITTER_CONSUMER_SECRET environment variables.');
+        }
       }
+      
+      if (error instanceof Error && error.message.includes('403')) {
+        throw new Error('Twitter app configuration error: 403 Forbidden. This usually means the callback URL needs to be added to your Twitter app settings.');
+      }
+      
       throw new Error(`Failed to initialize Twitter OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
