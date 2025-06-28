@@ -141,7 +141,10 @@ export class SocialMediaService {
         appSecret: process.env.TWITTER_CONSUMER_SECRET!,
       });
 
-      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/twitter/callback`;
+      const baseUrl = process.env.REPLIT_DOMAINS 
+        ? `https://${process.env.REPLIT_DOMAINS}` 
+        : (process.env.BASE_URL || 'http://localhost:5000');
+      const callbackUrl = `${baseUrl}/api/auth/twitter/callback`;
       console.log('Twitter OAuth callback URL:', callbackUrl);
       
       const authLink = await client.generateAuthLink(
@@ -174,7 +177,10 @@ export class SocialMediaService {
         throw new Error('Facebook app credentials not configured');
       }
 
-      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/facebook/callback`;
+      const baseUrl = process.env.REPLIT_DOMAINS 
+        ? `https://${process.env.REPLIT_DOMAINS}` 
+        : (process.env.BASE_URL || 'http://localhost:5000');
+      const callbackUrl = `${baseUrl}/api/auth/facebook/callback`;
       const state = Math.random().toString(36).substring(7);
       
       const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
@@ -200,7 +206,10 @@ export class SocialMediaService {
     try {
       const clientId = process.env.FACEBOOK_APP_ID;
       const clientSecret = process.env.FACEBOOK_APP_SECRET;
-      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/facebook/callback`;
+      const baseUrl = process.env.REPLIT_DOMAINS 
+        ? `https://${process.env.REPLIT_DOMAINS}` 
+        : (process.env.BASE_URL || 'http://localhost:5000');
+      const callbackUrl = `${baseUrl}/api/auth/facebook/callback`;
 
       // Exchange code for access token
       const tokenResponse = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?` +
@@ -239,7 +248,10 @@ export class SocialMediaService {
         throw new Error('LinkedIn app credentials not configured');
       }
 
-      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/linkedin/callback`;
+      const baseUrl = process.env.REPLIT_DOMAINS 
+        ? `https://${process.env.REPLIT_DOMAINS}` 
+        : (process.env.BASE_URL || 'http://localhost:5000');
+      const callbackUrl = `${baseUrl}/api/auth/linkedin/callback`;
       const state = Math.random().toString(36).substring(7);
       
       const authUrl = `https://www.linkedin.com/oauth/v2/authorization?` +
@@ -265,7 +277,10 @@ export class SocialMediaService {
     try {
       const clientId = process.env.LINKEDIN_CLIENT_ID;
       const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
-      const callbackUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/linkedin/callback`;
+      const baseUrl = process.env.REPLIT_DOMAINS 
+        ? `https://${process.env.REPLIT_DOMAINS}` 
+        : (process.env.BASE_URL || 'http://localhost:5000');
+      const callbackUrl = `${baseUrl}/api/auth/linkedin/callback`;
 
       // Exchange code for access token
       const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {

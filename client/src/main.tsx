@@ -13,7 +13,15 @@ if (!clerkPubKey) {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <ClerkProvider publishableKey={clerkPubKey}>
+  <ClerkProvider 
+    publishableKey={clerkPubKey}
+    afterSignOutUrl="/"
+    signInUrl="/sign-in"
+    signUpUrl="/sign-up"
+    appearance={{
+      baseTheme: undefined
+    }}
+  >
     <QueryClientProvider client={queryClient}>
       <App />
     </QueryClientProvider>
