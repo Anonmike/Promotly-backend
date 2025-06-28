@@ -100,3 +100,6 @@ Preferred communication style: Simple, everyday language.
 
 Changelog:
 - June 27, 2025. Initial setup
+- June 28, 2025. Implemented multi-platform OAuth authentication system for Twitter, Facebook, and LinkedIn
+- June 28, 2025. Added comprehensive social media posting support across multiple platforms
+- June 28, 2025. Enhanced platform selector to show connection status and dynamic availability

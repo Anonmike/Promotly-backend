@@ -97,10 +97,8 @@ export default function SocialAccounts() {
   });
 
   const completeOAuthMutation = useMutation({
-    mutationFn: async (verifier: string) => {
-      const response = await apiRequest("POST", "/api/auth/twitter/complete", {
-        oauth_verifier: verifier
-      });
+    mutationFn: async ({ platform, data }: { platform: string; data: any }) => {
+      const response = await apiRequest("POST", `/api/auth/${platform}/complete`, data);
       return response.json();
     },
     onSuccess: (data) => {
@@ -115,7 +113,51 @@ export default function SocialAccounts() {
     onError: (error) => {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to complete Twitter authorization",
+        description: error instanceof Error ? error.message : "Failed to complete authorization",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const facebookOAuthMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/auth/facebook/init");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setShowOAuthComplete(true);
+      toast({
+        title: "Facebook Authorization Required",
+        description: "Click the authorization link, then return here to complete the connection.",
+      });
+      window.open(data.authUrl, '_blank');
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to initialize Facebook authorization",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const linkedinOAuthMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/auth/linkedin/init");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setShowOAuthComplete(true);
+      toast({
+        title: "LinkedIn Authorization Required",
+        description: "Click the authorization link, then return here to complete the connection.",
+      });
+      window.open(data.authUrl, '_blank');
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to initialize LinkedIn authorization",
         variant: "destructive",
       });
     },
@@ -127,8 +169,21 @@ export default function SocialAccounts() {
     { id: "linkedin", name: "LinkedIn", icon: Linkedin, color: "bg-blue-700" },
   ];
 
+  const [currentPlatform, setCurrentPlatform] = useState<string>("");
+
   const handleConnectTwitter = () => {
+    setCurrentPlatform("twitter");
     twitterOAuthMutation.mutate();
+  };
+
+  const handleConnectFacebook = () => {
+    setCurrentPlatform("facebook");
+    facebookOAuthMutation.mutate();
+  };
+
+  const handleConnectLinkedIn = () => {
+    setCurrentPlatform("linkedin");
+    linkedinOAuthMutation.mutate();
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -230,10 +285,21 @@ export default function SocialAccounts() {
                   <div className="p-4 bg-blue-100 rounded-lg">
                     <h4 className="font-medium text-blue-900 mb-2">Instructions:</h4>
                     <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-                      <li>Click "Authorize app" on the Twitter page that opened</li>
-                      <li>Look for a verification code in the URL or on the page</li>
-                      <li>Copy the code and paste it below</li>
-                      <li>Click "Complete Connection"</li>
+                      {currentPlatform === "twitter" ? (
+                        <>
+                          <li>Click "Authorize app" on the Twitter page that opened</li>
+                          <li>Look for a verification code in the URL or on the page</li>
+                          <li>Copy the code and paste it below</li>
+                          <li>Click "Complete Connection"</li>
+                        </>
+                      ) : (
+                        <>
+                          <li>Click "Continue" or "Authorize" on the {currentPlatform} page that opened</li>
+                          <li>Copy the entire URL from the address bar after authorization</li>
+                          <li>Paste the URL below (it contains the authorization code)</li>
+                          <li>Click "Complete Connection"</li>
+                        </>
+                      )}
                     </ol>
                   </div>
                   
@@ -252,7 +318,24 @@ export default function SocialAccounts() {
                   
                   <div className="flex space-x-2">
                     <Button
-                      onClick={() => completeOAuthMutation.mutate(oauthVerifier)}
+                      onClick={() => {
+                        if (currentPlatform === "twitter") {
+                          completeOAuthMutation.mutate({ 
+                            platform: "twitter", 
+                            data: { oauth_verifier: oauthVerifier }
+                          });
+                        } else {
+                          // For Facebook and LinkedIn, we need both code and state
+                          const urlParams = new URLSearchParams(oauthVerifier);
+                          const code = urlParams.get('code') || oauthVerifier;
+                          const state = urlParams.get('state') || "";
+                          
+                          completeOAuthMutation.mutate({ 
+                            platform: currentPlatform, 
+                            data: { code, state }
+                          });
+                        }
+                      }}
                       disabled={!oauthVerifier.trim() || completeOAuthMutation.isPending}
                       className="flex-1"
                     >
@@ -273,8 +356,8 @@ export default function SocialAccounts() {
               </Card>
             )}
 
-            {/* Facebook - Coming Soon */}
-            <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
+            {/* Facebook */}
+            <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center space-x-3">
                 <div className="p-2 rounded-full bg-blue-600">
                   <Facebook className="h-5 w-5 text-white" />
@@ -284,11 +367,38 @@ export default function SocialAccounts() {
                   <p className="text-sm text-gray-600">Schedule posts and manage your Facebook pages</p>
                 </div>
               </div>
-              <Badge variant="secondary">Coming Soon</Badge>
+              <div className="flex items-center space-x-2">
+                {accounts.find(account => account.platform === 'facebook') ? (
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="default" className="flex items-center space-x-1">
+                      <CheckCircle className="h-3 w-3" />
+                      <span>Connected as {accounts.find(account => account.platform === 'facebook')?.accountName}</span>
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(accounts.find(account => account.platform === 'facebook')!.id)}
+                      disabled={deleteMutation.isPending}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={handleConnectFacebook}
+                    disabled={facebookOAuthMutation.isPending || showOAuthComplete}
+                    className="flex items-center space-x-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    <span>{facebookOAuthMutation.isPending ? "Connecting..." : "Connect Facebook"}</span>
+                  </Button>
+                )}
+              </div>
             </div>
 
-            {/* LinkedIn - Coming Soon */}
-            <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
+            {/* LinkedIn */}
+            <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center space-x-3">
                 <div className="p-2 rounded-full bg-blue-700">
                   <Linkedin className="h-5 w-5 text-white" />
@@ -298,7 +408,34 @@ export default function SocialAccounts() {
                   <p className="text-sm text-gray-600">Schedule professional posts and manage your LinkedIn presence</p>
                 </div>
               </div>
-              <Badge variant="secondary">Coming Soon</Badge>
+              <div className="flex items-center space-x-2">
+                {accounts.find(account => account.platform === 'linkedin') ? (
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="default" className="flex items-center space-x-1">
+                      <CheckCircle className="h-3 w-3" />
+                      <span>Connected as {accounts.find(account => account.platform === 'linkedin')?.accountName}</span>
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(accounts.find(account => account.platform === 'linkedin')!.id)}
+                      disabled={deleteMutation.isPending}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={handleConnectLinkedIn}
+                    disabled={linkedinOAuthMutation.isPending || showOAuthComplete}
+                    className="flex items-center space-x-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    <span>{linkedinOAuthMutation.isPending ? "Connecting..." : "Connect LinkedIn"}</span>
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

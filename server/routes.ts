@@ -125,6 +125,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Facebook OAuth routes
+  app.post("/api/auth/facebook/init", authenticateToken, async (req: any, res) => {
+    try {
+      const oauthData = await socialMediaService.initializeFacebookOAuth();
+      
+      // Store OAuth state temporarily in session
+      (req as any).session.facebookOAuth = {
+        state: oauthData.state,
+        userId: req.user.userId
+      };
+
+      console.log('Stored Facebook OAuth data in session:', {
+        sessionId: req.sessionID,
+        state: oauthData.state,
+        userId: req.user.userId
+      });
+
+      res.json({ 
+        authUrl: oauthData.authUrl,
+        state: oauthData.state,
+        message: "For localhost development, you'll need to manually complete the OAuth flow after authorization"
+      });
+    } catch (error) {
+      console.error('Facebook OAuth init error:', error);
+      res.status(500).json({ 
+        message: "Failed to initialize Facebook OAuth",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post("/api/auth/facebook/complete", authenticateToken, async (req: any, res) => {
+    try {
+      const { code, state } = req.body;
+      
+      if (!code || !state) {
+        return res.status(400).json({ message: "Authorization code and state required" });
+      }
+
+      // Retrieve stored OAuth data
+      const oauthData = (req as any).session.facebookOAuth;
+      if (!oauthData || oauthData.state !== state) {
+        return res.status(400).json({ message: "Invalid OAuth state. Please reinitialize Facebook OAuth." });
+      }
+
+      console.log('Facebook OAuth completion:', {
+        sessionId: req.sessionID,
+        hasOAuthData: !!oauthData,
+        receivedState: state,
+        storedState: oauthData.state
+      });
+
+      // Complete OAuth flow
+      const result = await socialMediaService.completeFacebookOAuth(code, state);
+
+      // Store the Facebook account
+      await storage.createSocialAccount({
+        userId: oauthData.userId,
+        platform: "facebook",
+        accountId: result.userId,
+        accountName: result.userName,
+        accessToken: result.accessToken,
+        accessTokenSecret: "", // Facebook doesn't use token secret
+      });
+
+      // Clear OAuth session data
+      delete (req as any).session.facebookOAuth;
+
+      res.json({ 
+        success: true, 
+        message: `Facebook account ${result.userName} connected successfully!`,
+        account: {
+          platform: "facebook",
+          accountName: result.userName
+        }
+      });
+    } catch (error) {
+      console.error('Facebook OAuth completion error:', error);
+      res.status(500).json({ 
+        message: "Failed to complete Facebook OAuth",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // LinkedIn OAuth routes
+  app.post("/api/auth/linkedin/init", authenticateToken, async (req: any, res) => {
+    try {
+      const oauthData = await socialMediaService.initializeLinkedInOAuth();
+      
+      // Store OAuth state temporarily in session
+      (req as any).session.linkedinOAuth = {
+        state: oauthData.state,
+        userId: req.user.userId
+      };
+
+      console.log('Stored LinkedIn OAuth data in session:', {
+        sessionId: req.sessionID,
+        state: oauthData.state,
+        userId: req.user.userId
+      });
+
+      res.json({ 
+        authUrl: oauthData.authUrl,
+        state: oauthData.state,
+        message: "For localhost development, you'll need to manually complete the OAuth flow after authorization"
+      });
+    } catch (error) {
+      console.error('LinkedIn OAuth init error:', error);
+      res.status(500).json({ 
+        message: "Failed to initialize LinkedIn OAuth",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post("/api/auth/linkedin/complete", authenticateToken, async (req: any, res) => {
+    try {
+      const { code, state } = req.body;
+      
+      if (!code || !state) {
+        return res.status(400).json({ message: "Authorization code and state required" });
+      }
+
+      // Retrieve stored OAuth data
+      const oauthData = (req as any).session.linkedinOAuth;
+      if (!oauthData || oauthData.state !== state) {
+        return res.status(400).json({ message: "Invalid OAuth state. Please reinitialize LinkedIn OAuth." });
+      }
+
+      console.log('LinkedIn OAuth completion:', {
+        sessionId: req.sessionID,
+        hasOAuthData: !!oauthData,
+        receivedState: state,
+        storedState: oauthData.state
+      });
+
+      // Complete OAuth flow
+      const result = await socialMediaService.completeLinkedInOAuth(code, state);
+
+      // Store the LinkedIn account
+      await storage.createSocialAccount({
+        userId: oauthData.userId,
+        platform: "linkedin",
+        accountId: result.userId,
+        accountName: result.userName,
+        accessToken: result.accessToken,
+        accessTokenSecret: "", // LinkedIn doesn't use token secret
+      });
+
+      // Clear OAuth session data
+      delete (req as any).session.linkedinOAuth;
+
+      res.json({ 
+        success: true, 
+        message: `LinkedIn account ${result.userName} connected successfully!`,
+        account: {
+          platform: "linkedin",
+          accountName: result.userName
+        }
+      });
+    } catch (error) {
+      console.error('LinkedIn OAuth completion error:', error);
+      res.status(500).json({ 
+        message: "Failed to complete LinkedIn OAuth",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Manual OAuth completion for localhost development
   app.post("/api/auth/twitter/complete", authenticateToken, async (req: any, res) => {
     try {
