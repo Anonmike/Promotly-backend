@@ -1,13 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink, Copy } from "lucide-react";
+import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 
 interface SocialAccount {
   id: number;
@@ -19,9 +17,6 @@ interface SocialAccount {
 
 export default function SocialAccounts() {
   const { toast } = useToast();
-  const [showOAuthComplete, setShowOAuthComplete] = useState(false);
-  const [oauthVerifier, setOauthVerifier] = useState("");
-  const [oauthData, setOauthData] = useState<any>(null);
 
   // Check for connection success/error messages in URL
   useEffect(() => {
@@ -33,6 +28,20 @@ export default function SocialAccounts() {
       toast({
         title: "Success!",
         description: "Twitter account connected successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (connected === 'facebook') {
+      toast({
+        title: "Success!",
+        description: "Facebook account connected successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (connected === 'linkedin') {
+      toast({
+        title: "Success!",
+        description: "LinkedIn account connected successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
       window.history.replaceState({}, '', window.location.pathname);
@@ -93,44 +102,17 @@ export default function SocialAccounts() {
       return response.json();
     },
     onSuccess: (data) => {
-      // Store OAuth data for session-less completion
-      setOauthData(data);
-      setShowOAuthComplete(true);
       toast({
-        title: "Twitter Authorization Required",
-        description: "Click the authorization link, then return here to complete the connection.",
+        title: "Redirecting to Twitter",
+        description: "You'll be redirected to Twitter for authorization.",
       });
-      // Open Twitter authorization in new tab
-      window.open(data.authUrl, '_blank');
+      // Redirect to Twitter authorization in the same window for proper callback handling
+      window.location.href = data.authUrl;
     },
     onError: (error) => {
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to initialize Twitter authorization",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const completeOAuthMutation = useMutation({
-    mutationFn: async ({ platform, data }: { platform: string; data: any }) => {
-      const response = await apiRequest("POST", `/api/auth/${platform}/complete`, data);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
-      setShowOAuthComplete(false);
-      setOauthVerifier("");
-      setOauthData(null);
-      toast({
-        title: "Success!",
-        description: `${data.account?.platform} account connected successfully as ${data.account?.accountName}`,
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to complete authorization",
         variant: "destructive",
       });
     },
@@ -142,12 +124,11 @@ export default function SocialAccounts() {
       return response.json();
     },
     onSuccess: (data) => {
-      setShowOAuthComplete(true);
       toast({
-        title: "Facebook Authorization Required",
-        description: "Click the authorization link, then return here to complete the connection.",
+        title: "Redirecting to Facebook",
+        description: "You'll be redirected to Facebook for authorization.",
       });
-      window.open(data.authUrl, '_blank');
+      window.location.href = data.authUrl;
     },
     onError: (error) => {
       toast({
@@ -164,12 +145,11 @@ export default function SocialAccounts() {
       return response.json();
     },
     onSuccess: (data) => {
-      setShowOAuthComplete(true);
       toast({
-        title: "LinkedIn Authorization Required",
-        description: "Click the authorization link, then return here to complete the connection.",
+        title: "Redirecting to LinkedIn",
+        description: "You'll be redirected to LinkedIn for authorization.",
       });
-      window.open(data.authUrl, '_blank');
+      window.location.href = data.authUrl;
     },
     onError: (error) => {
       toast({
@@ -180,74 +160,45 @@ export default function SocialAccounts() {
     },
   });
 
-  const platforms = [
-    { id: "twitter", name: "Twitter/X", icon: Twitter, color: "bg-blue-500" },
-    { id: "facebook", name: "Facebook", icon: Facebook, color: "bg-blue-600" },
-    { id: "linkedin", name: "LinkedIn", icon: Linkedin, color: "bg-blue-700" },
-  ];
-
-  const [currentPlatform, setCurrentPlatform] = useState<string>("");
-
   const handleConnectTwitter = () => {
-    setCurrentPlatform("twitter");
     twitterOAuthMutation.mutate();
   };
 
   const handleConnectFacebook = () => {
-    setCurrentPlatform("facebook");
     facebookOAuthMutation.mutate();
   };
 
   const handleConnectLinkedIn = () => {
-    setCurrentPlatform("linkedin");
     linkedinOAuthMutation.mutate();
   };
 
-  const getPlatformIcon = (platform: string) => {
-    const platformData = platforms.find(p => p.id === platform);
-    const Icon = platformData?.icon || Twitter;
-    return <Icon className="h-5 w-5" />;
-  };
-
-  const getPlatformColor = (platform: string) => {
-    const platformData = platforms.find(p => p.id === platform);
-    return platformData?.color || "bg-gray-500";
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Social Media Accounts</h1>
-        </div>
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 bg-gray-100 rounded-lg animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const twitterAccount = accounts.find(account => account.platform === 'twitter');
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Social Media Accounts</h1>
-        <p className="text-gray-600 mt-2">Connect your social media accounts to start scheduling posts</p>
-      </div>
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Social Media Accounts</h1>
+          <p className="text-gray-600">Connect your social media accounts to start scheduling posts across platforms.</p>
+        </div>
 
-      {/* Available Platforms */}
-      <div className="grid gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Available Platforms</CardTitle>
-            <CardDescription>
-              Connect your social media accounts using secure OAuth authentication
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
+                    <div>
+                      <div className="h-4 bg-gray-300 rounded w-24 mb-2"></div>
+                      <div className="h-3 bg-gray-300 rounded w-48"></div>
+                    </div>
+                  </div>
+                  <div className="h-8 bg-gray-300 rounded w-20"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-6">
             {/* Twitter */}
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center space-x-3">
@@ -255,21 +206,21 @@ export default function SocialAccounts() {
                   <Twitter className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Twitter/X</h3>
-                  <p className="text-sm text-gray-600">Schedule tweets and manage your Twitter presence</p>
+                  <h3 className="font-semibold">Twitter</h3>
+                  <p className="text-sm text-gray-600">Share updates and engage with your Twitter audience</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                {twitterAccount ? (
+                {accounts.find(account => account.platform === 'twitter') ? (
                   <div className="flex items-center space-x-2">
                     <Badge variant="default" className="flex items-center space-x-1">
                       <CheckCircle className="h-3 w-3" />
-                      <span>Connected as @{twitterAccount.accountName}</span>
+                      <span>Connected as {accounts.find(account => account.platform === 'twitter')?.accountName}</span>
                     </Badge>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => deleteMutation.mutate(twitterAccount.id)}
+                      onClick={() => deleteMutation.mutate(accounts.find(account => account.platform === 'twitter')!.id)}
                       disabled={deleteMutation.isPending}
                       className="text-red-600 hover:text-red-700"
                     >
@@ -279,7 +230,7 @@ export default function SocialAccounts() {
                 ) : (
                   <Button 
                     onClick={handleConnectTwitter}
-                    disabled={twitterOAuthMutation.isPending || showOAuthComplete}
+                    disabled={twitterOAuthMutation.isPending}
                     className="flex items-center space-x-2"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -288,95 +239,6 @@ export default function SocialAccounts() {
                 )}
               </div>
             </div>
-
-            {/* Manual OAuth Completion - Show only when needed */}
-            {showOAuthComplete && (
-              <Card className="border-blue-200 bg-blue-50">
-                <CardHeader>
-                  <CardTitle className="text-blue-900">Complete Twitter Authorization</CardTitle>
-                  <CardDescription className="text-blue-700">
-                    After authorizing our app on Twitter, copy the verification code from the URL and paste it below.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-blue-100 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">Instructions:</h4>
-                    <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-                      {currentPlatform === "twitter" ? (
-                        <>
-                          <li>Click "Authorize app" on the Twitter page that opened</li>
-                          <li>Look for a verification code in the URL or on the page</li>
-                          <li>Copy the code and paste it below</li>
-                          <li>Click "Complete Connection"</li>
-                        </>
-                      ) : (
-                        <>
-                          <li>Click "Continue" or "Authorize" on the {currentPlatform} page that opened</li>
-                          <li>Copy the entire URL from the address bar after authorization</li>
-                          <li>Paste the URL below (it contains the authorization code)</li>
-                          <li>Click "Complete Connection"</li>
-                        </>
-                      )}
-                    </ol>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="oauth-verifier" className="text-blue-900">
-                      Verification Code
-                    </Label>
-                    <Input
-                      id="oauth-verifier"
-                      value={oauthVerifier}
-                      onChange={(e) => setOauthVerifier(e.target.value)}
-                      placeholder="Enter the verification code from Twitter"
-                      className="border-blue-300"
-                    />
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    <Button
-                      onClick={() => {
-                        if (currentPlatform === "twitter" && oauthData) {
-                          completeOAuthMutation.mutate({ 
-                            platform: "twitter", 
-                            data: { 
-                              oauth_token: oauthData.oauthToken,
-                              oauth_verifier: oauthVerifier,
-                              oauth_token_secret: oauthData.oauthTokenSecret
-                            }
-                          });
-                        } else {
-                          // For Facebook and LinkedIn, we need both code and state
-                          const urlParams = new URLSearchParams(oauthVerifier);
-                          const code = urlParams.get('code') || oauthVerifier;
-                          const state = urlParams.get('state') || "";
-                          
-                          completeOAuthMutation.mutate({ 
-                            platform: currentPlatform, 
-                            data: { code, state }
-                          });
-                        }
-                      }}
-                      disabled={!oauthVerifier.trim() || completeOAuthMutation.isPending}
-                      className="flex-1"
-                    >
-                      {completeOAuthMutation.isPending ? "Connecting..." : "Complete Connection"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowOAuthComplete(false);
-                        setOauthVerifier("");
-                        setOauthData(null);
-                      }}
-                      disabled={completeOAuthMutation.isPending}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Facebook */}
             <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -409,7 +271,7 @@ export default function SocialAccounts() {
                 ) : (
                   <Button 
                     onClick={handleConnectFacebook}
-                    disabled={facebookOAuthMutation.isPending || showOAuthComplete}
+                    disabled={facebookOAuthMutation.isPending}
                     className="flex items-center space-x-2"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -427,7 +289,7 @@ export default function SocialAccounts() {
                 </div>
                 <div>
                   <h3 className="font-semibold">LinkedIn</h3>
-                  <p className="text-sm text-gray-600">Schedule professional posts and manage your LinkedIn presence</p>
+                  <p className="text-sm text-gray-600">Share professional content with your network</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -450,7 +312,7 @@ export default function SocialAccounts() {
                 ) : (
                   <Button 
                     onClick={handleConnectLinkedIn}
-                    disabled={linkedinOAuthMutation.isPending || showOAuthComplete}
+                    disabled={linkedinOAuthMutation.isPending}
                     className="flex items-center space-x-2"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -459,62 +321,27 @@ export default function SocialAccounts() {
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Connected Accounts Summary */}
-      {accounts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Connected Accounts</CardTitle>
-            <CardDescription>
-              Your currently connected social media accounts
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {accounts.map((account: SocialAccount) => (
-                <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded-full ${getPlatformColor(account.platform)}`}>
-                      <div className="text-white">
-                        {getPlatformIcon(account.platform)}
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">{account.accountName}</h3>
-                      <p className="text-sm text-gray-600 capitalize">{account.platform}</p>
-                      <p className="text-xs text-gray-500">
-                        Connected {new Date(account.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <Badge 
-                      variant={account.isActive ? "default" : "secondary"}
-                      className="flex items-center space-x-1"
-                    >
-                      {account.isActive ? (
-                        <>
-                          <CheckCircle className="h-3 w-3" />
-                          <span>Active</span>
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle className="h-3 w-3" />
-                          <span>Inactive</span>
-                        </>
-                      )}
-                    </Badge>
-                  </div>
+            {/* Information Card */}
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader>
+                <CardTitle className="text-blue-900 flex items-center space-x-2">
+                  <AlertCircle className="h-5 w-5" />
+                  <span>How it works</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm text-blue-800">
+                  <p>• Click "Connect" to authorize Promotly to post on your behalf</p>
+                  <p>• You'll be redirected to the platform's authorization page</p>
+                  <p>• After approval, you'll return here with your account connected</p>
+                  <p>• Connected accounts will appear in the platform selector when creating posts</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
