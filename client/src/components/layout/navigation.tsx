@@ -7,12 +7,12 @@ import {
   Calendar, 
   FileText, 
   TrendingUp, 
-  Share2,
   Settings,
   Bell,
   Menu,
   X
 } from "lucide-react";
+import promotlyLogo from "@/assets/promotly-logo.png";
 
 export default function Navigation() {
   const [location] = useLocation();
@@ -33,9 +33,9 @@ export default function Navigation() {
           {/* Logo */}
           <div className="flex items-center space-x-4">
             <Link href="/">
-              <div className="flex items-center space-x-2 cursor-pointer">
-                <Share2 className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">Social Scheduler</span>
+              <div className="flex items-center space-x-3 cursor-pointer">
+                <img src={promotlyLogo} alt="Promotly" className="h-8 w-8" />
+                <span className="text-xl font-bold text-gray-900">Promotly</span>
               </div>
             </Link>
           </div>

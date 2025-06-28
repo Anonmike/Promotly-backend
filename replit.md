@@ -1,8 +1,8 @@
-# Social Media Scheduler
+# Promotly
 
 ## Overview
 
-This is a full-stack social media scheduling application built with React, Express.js, and TypeScript. The application allows users to create, schedule, and manage social media posts across multiple platforms (Twitter, Facebook, LinkedIn), with analytics tracking and a modern, responsive UI.
+Promotly is a full-stack social media scheduling platform built with React, Express.js, and TypeScript. The application allows users to create, schedule, and manage social media posts across multiple platforms (Twitter, Facebook, LinkedIn), with analytics tracking and a modern, responsive UI featuring the Promotly brand identity.
 
 ## System Architecture
 
@@ -104,6 +104,12 @@ Preferred communication style: Simple, everyday language.
   - Created manual OAuth completion interface for localhost development
   - Configured production callback URL for app.promotlyai.com
   - Twitter app requires callback URLs: `http://localhost:5000/api/auth/twitter/callback` (dev) and `https://app.promotlyai.com/api/auth/twitter/callback` (prod)
+
+- **June 28, 2025**: Rebranded application to Promotly
+  - Updated application name from "Social Media Scheduler" to "Promotly"
+  - Integrated Promotly logo throughout the UI (navigation, favicon)
+  - Updated page titles, headings, and descriptions to reflect Promotly branding
+  - Maintained all existing functionality while enhancing brand identity
 
 ## Changelog
 

@@ -163,7 +163,7 @@ export default function SocialAccounts() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Social Media Accounts</h1>
-        <p className="text-gray-600 mt-2">Connect your social media accounts to start scheduling posts</p>
+        <p className="text-gray-600 mt-2">Connect your social media accounts to Promotly to start scheduling posts</p>
       </div>
 
       {/* Available Platforms */}

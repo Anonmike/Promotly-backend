@@ -18,7 +18,7 @@ export class SchedulerService {
     });
 
     this.isSchedulerRunning = true;
-    console.log("Social media scheduler started");
+    console.log("Promotly social media scheduler started");
   }
 
   stop() {
