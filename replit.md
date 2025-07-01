@@ -98,6 +98,12 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **January 01, 2025**: Switched to Clerk default authentication components
+  - Removed custom branded authentication page in favor of Clerk's built-in SignIn/SignUp components
+  - Updated all authentication routes to redirect to /signin instead of /auth
+  - Simplified authentication flow while maintaining full Clerk integration
+  - All social media OAuth functionality remains unchanged
+
 - **June 28, 2025**: Implemented Twitter OAuth authentication system
   - Replaced manual token input with secure OAuth 1.0a flow
   - Added session-based OAuth state management
