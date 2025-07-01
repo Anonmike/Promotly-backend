@@ -80,6 +80,14 @@ function Router() {
           <Redirect to="/auth" />
         </SignedOut>
       </Route>
+      <Route path="/recommendations">
+        <SignedIn>
+          <AuthenticatedApp />
+        </SignedIn>
+        <SignedOut>
+          <Redirect to="/auth" />
+        </SignedOut>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

@@ -13,7 +13,8 @@ import {
   Settings,
   Bell,
   Menu,
-  X
+  X,
+  Lightbulb
 } from "lucide-react";
 import promotlyLogo from "@/assets/promotly-logo.png";
 
@@ -30,6 +31,7 @@ export default function Navigation() {
     { href: "/schedule", label: "Schedule", icon: Calendar },
     { href: "/posts", label: "Posts", icon: FileText },
     { href: "/analytics", label: "Analytics", icon: TrendingUp },
+    { href: "/recommendations", label: "AI Suggestions", icon: Lightbulb },
     { href: "/accounts", label: "Accounts", icon: Settings },
   ];
 
