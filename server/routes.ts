@@ -114,7 +114,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/social-accounts", authenticateClerkToken, async (req: any, res) => {
     try {
       const accounts = await storage.getSocialAccounts(req.user.userId);
-      res.json({ accounts });
+      
+      // Check account status for each account
+      const accountsWithStatus = await Promise.all(
+        accounts.map(async (account) => {
+          let isConnected = true;
+          
+          // Validate Twitter tokens
+          if (account.platform === 'twitter') {
+            try {
+              isConnected = await socialMediaService.validateTwitterToken(account);
+            } catch (error) {
+              console.error(`Error validating Twitter account ${account.accountName}:`, error);
+              isConnected = false;
+            }
+          }
+          
+          return {
+            ...account,
+            isConnected,
+            status: isConnected ? 'connected' : 'disconnected'
+          };
+        })
+      );
+      
+      res.json({ accounts: accountsWithStatus });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch social accounts" });
     }
@@ -307,6 +331,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ account });
     } catch (error) {
       res.status(400).json({ message: "Invalid account data" });
+    }
+  });
+
+  // Refresh account status
+  app.post("/api/social-accounts/:id/refresh", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const accountId = parseInt(req.params.id);
+      const accounts = await storage.getSocialAccounts(req.user.userId);
+      const account = accounts.find(acc => acc.id === accountId);
+      
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      let isConnected = true;
+      let statusMessage = "Account is connected";
+      
+      // Validate token based on platform
+      if (account.platform === 'twitter') {
+        try {
+          isConnected = await socialMediaService.validateTwitterToken(account);
+          statusMessage = isConnected ? "Twitter account is connected" : "Twitter account is disconnected. Please reconnect.";
+        } catch (error) {
+          console.error(`Error validating Twitter account ${account.accountName}:`, error);
+          isConnected = false;
+          statusMessage = "Twitter account validation failed. Please reconnect.";
+        }
+      }
+      
+      res.json({ 
+        isConnected,
+        status: isConnected ? 'connected' : 'disconnected',
+        message: statusMessage,
+        account: {
+          ...account,
+          isConnected,
+          status: isConnected ? 'connected' : 'disconnected'
+        }
+      });
+    } catch (error) {
+      console.error('Account refresh error:', error);
+      res.status(500).json({ message: "Failed to refresh account status" });
     }
   });
 

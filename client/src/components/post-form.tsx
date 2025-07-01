@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import PlatformSelector from "./platform-selector";
-import { Calendar, Clock, Send } from "lucide-react";
+import { Calendar, Clock, Send, AlertTriangle, ExternalLink } from "lucide-react";
 
 const postFormSchema = z.object({
   content: z.string().min(1, "Content is required").max(500, "Content must be less than 500 characters"),
@@ -26,6 +27,14 @@ export default function PostForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Get social accounts to check connection status
+  const { data: accountsData } = useQuery({
+    queryKey: ["/api/social-accounts"],
+  });
+
+  const accounts = (accountsData as { accounts: any[] })?.accounts || [];
+  const disconnectedAccounts = accounts.filter(account => account.isConnected === false);
   
   const form = useForm<PostFormData>({
     resolver: zodResolver(postFormSchema),
@@ -77,6 +86,31 @@ export default function PostForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Connection Warning */}
+        {disconnectedAccounts.length > 0 && (
+          <Alert className="border-amber-200 bg-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800">
+              <div className="space-y-2">
+                <p className="font-medium">Some accounts are disconnected:</p>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  {disconnectedAccounts.map((account) => (
+                    <li key={account.id}>
+                      <span className="capitalize">{account.platform}</span> account (@{account.accountName}) needs reconnection
+                    </li>
+                  ))}
+                </ul>
+                <Button variant="outline" size="sm" className="mt-2" asChild>
+                  <a href="/social-accounts" className="flex items-center space-x-1">
+                    <ExternalLink className="h-3 w-3" />
+                    <span>Fix Connections</span>
+                  </a>
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Content */}
         <FormField
           control={form.control}

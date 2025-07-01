@@ -8,6 +8,12 @@ export class SocialMediaService {
   // Twitter/X Integration
   async postToTwitter(post: Post, account: SocialAccount): Promise<string> {
     try {
+      // Validate token before attempting to post
+      const isTokenValid = await this.validateTwitterToken(account);
+      if (!isTokenValid) {
+        throw new Error('Twitter account disconnected. Please reconnect your Twitter account.');
+      }
+
       const client = this.getTwitterClient(account);
       
       // Validate content length for Twitter
@@ -29,8 +35,25 @@ export class SocialMediaService {
 
       const tweet = await client.v2.tweet(tweetData);
       return tweet.data.id;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Twitter posting error:', error);
+      
+      // Handle specific Twitter API errors
+      if (error.code === 401 || error.code === 403) {
+        // Clear cached client for this account
+        const key = `${account.userId}_${account.platform}`;
+        this.twitterClients.delete(key);
+        throw new Error('Twitter account disconnected. Please reconnect your Twitter account.');
+      }
+      
+      if (error.message?.includes('duplicate')) {
+        throw new Error('This tweet appears to be a duplicate of a recent post.');
+      }
+      
+      if (error.code === 429) {
+        throw new Error('Twitter rate limit reached. Please try again later.');
+      }
+      
       throw new Error(`Twitter posting failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -141,6 +164,33 @@ export class SocialMediaService {
     }
 
     return this.twitterClients.get(key)!;
+  }
+
+  // Validate Twitter token by making a simple API call
+  async validateTwitterToken(account: SocialAccount): Promise<boolean> {
+    try {
+      const client = this.getTwitterClient(account);
+      
+      // Try to get user info to validate token
+      await client.v2.me();
+      return true;
+    } catch (error: any) {
+      console.error(`Twitter token validation failed for account ${account.accountName}:`, error);
+      
+      // Check for specific error codes that indicate invalid tokens
+      if (error.code === 401 || error.code === 403 || 
+          error.message?.includes('Invalid or expired token') ||
+          error.message?.includes('Could not authenticate')) {
+        
+        // Clear the cached client since token is invalid
+        const key = `${account.userId}_${account.platform}`;
+        this.twitterClients.delete(key);
+        return false;
+      }
+      
+      // For other errors (rate limits, network issues), assume token is still valid
+      return true;
+    }
   }
 
   // Twitter OAuth Flow

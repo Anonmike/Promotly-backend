@@ -15,6 +15,8 @@ interface SocialAccount {
   accountName: string;
   isActive: boolean;
   createdAt: string;
+  isConnected?: boolean;
+  status?: string;
 }
 
 export default function SocialAccounts() {
@@ -121,6 +123,28 @@ export default function SocialAccounts() {
     },
   });
 
+  const refreshAccountMutation = useMutation({
+    mutationFn: async (accountId: number) => {
+      const response = await apiRequest("POST", `/api/social-accounts/${accountId}/refresh`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      toast({
+        title: data.isConnected ? "Connected" : "Disconnected",
+        description: data.message,
+        variant: data.isConnected ? "default" : "destructive",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to refresh account status",
+        variant: "destructive",
+      });
+    },
+  });
+
   const platforms = [
     { id: "twitter", name: "Twitter/X", icon: Twitter, color: "bg-blue-500" },
     { id: "facebook", name: "Facebook", icon: Facebook, color: "bg-blue-600" },
@@ -190,10 +214,31 @@ export default function SocialAccounts() {
               <div className="flex items-center space-x-2">
                 {twitterAccount ? (
                   <div className="flex items-center space-x-2">
-                    <Badge variant="default" className="flex items-center space-x-1">
-                      <CheckCircle className="h-3 w-3" />
-                      <span>Connected as @{twitterAccount.accountName}</span>
+                    <Badge 
+                      variant={twitterAccount.isConnected === false ? "destructive" : "default"} 
+                      className="flex items-center space-x-1"
+                    >
+                      {twitterAccount.isConnected === false ? (
+                        <>
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Disconnected</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Connected as @{twitterAccount.accountName}</span>
+                        </>
+                      )}
                     </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refreshAccountMutation.mutate(twitterAccount.id)}
+                      disabled={refreshAccountMutation.isPending}
+                      title="Refresh connection status"
+                    >
+                      {refreshAccountMutation.isPending ? "..." : "↻"}
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

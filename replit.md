@@ -170,6 +170,15 @@ Preferred communication style: Simple, everyday language.
   - Added proper icons, colors, and styling matching Promotly's design system
   - Improved user experience with smooth animations and better accessibility
 
+- **January 01, 2025**: Fixed Twitter OAuth session persistence
+  - Implemented robust Twitter token validation system with automatic disconnection detection
+  - Added token validation before posting to prevent failed posts due to expired/invalid tokens
+  - Enhanced error handling with specific Twitter API error codes (401, 403, 429, duplicates)
+  - Created account refresh functionality to check connection status on-demand
+  - Added visual indicators for disconnected accounts with red badges and alerts
+  - Implemented connection warnings in post scheduler when accounts are disconnected
+  - Users now get immediate feedback about account status and can refresh connections manually
+
 ## Changelog
 
 - June 27, 2025: Initial setup
