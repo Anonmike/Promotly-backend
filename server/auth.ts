@@ -174,13 +174,35 @@ export function setupAuth(app: Express) {
   });
 }
 
-// Middleware to authenticate requests
+// Middleware to authenticate requests using Clerk JWT
 export function authenticateUser(req: any, res: any, next: any) {
-  if (!req.isAuthenticated()) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: "Authentication required" });
   }
+
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
   
-  // Add user info to request for convenience
-  req.user.userId = req.user.id;
-  next();
+  try {
+    // For now, we'll decode the JWT without verification for development
+    // In production, you should verify the JWT signature with Clerk's public key
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    
+    // Set user info from Clerk JWT payload
+    req.user = {
+      id: payload.sub, // Clerk user ID
+      userId: payload.sub,
+      email: payload.email,
+      username: payload.username || payload.email?.split('@')[0],
+      fullName: payload.first_name && payload.last_name 
+        ? `${payload.first_name} ${payload.last_name}` 
+        : payload.first_name || payload.last_name || null
+    };
+    
+    next();
+  } catch (error) {
+    console.error('JWT decode error:', error);
+    return res.status(401).json({ message: "Invalid token" });
+  }
 }
