@@ -88,17 +88,23 @@ export class BrowserAutomationService {
       // Navigate to Twitter
       await page.goto('https://x.com', { waitUntil: 'networkidle0' });
       
-      // Set cookies
-      await page.setCookie(...cookies.map(cookie => ({
-        name: cookie.name,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path || '/',
-        expires: cookie.expires,
-        httpOnly: cookie.httpOnly || false,
-        secure: cookie.secure || true,
-        sameSite: cookie.sameSite || 'None'
-      })));
+      // Set cookies one by one to avoid protocol errors
+      for (const cookie of cookies) {
+        try {
+          await page.setCookie({
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path || '/',
+            expires: cookie.expires ? cookie.expires : undefined,
+            httpOnly: cookie.httpOnly || false,
+            secure: cookie.secure !== false,
+            sameSite: (cookie.sameSite as 'Strict' | 'Lax' | 'None') || 'Lax'
+          });
+        } catch (cookieError) {
+          console.warn(`Failed to set cookie ${cookie.name}:`, cookieError);
+        }
+      }
       
       // Reload page with cookies
       await page.reload({ waitUntil: 'networkidle0' });
@@ -170,17 +176,23 @@ export class BrowserAutomationService {
       
       await page.goto('https://www.linkedin.com', { waitUntil: 'networkidle0' });
       
-      // Set LinkedIn cookies
-      await page.setCookie(...cookies.map(cookie => ({
-        name: cookie.name,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path || '/',
-        expires: cookie.expires,
-        httpOnly: cookie.httpOnly || false,
-        secure: cookie.secure || true,
-        sameSite: cookie.sameSite || 'None'
-      })));
+      // Set LinkedIn cookies one by one to avoid protocol errors
+      for (const cookie of cookies) {
+        try {
+          await page.setCookie({
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path || '/',
+            expires: cookie.expires ? cookie.expires : undefined,
+            httpOnly: cookie.httpOnly || false,
+            secure: cookie.secure !== false,
+            sameSite: (cookie.sameSite as 'Strict' | 'Lax' | 'None') || 'Lax'
+          });
+        } catch (cookieError) {
+          console.warn(`Failed to set cookie ${cookie.name}:`, cookieError);
+        }
+      }
       
       await page.reload({ waitUntil: 'networkidle0' });
       
@@ -238,17 +250,23 @@ export class BrowserAutomationService {
       
       await page.goto('https://www.facebook.com', { waitUntil: 'networkidle0' });
       
-      // Set Facebook cookies
-      await page.setCookie(...cookies.map(cookie => ({
-        name: cookie.name,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path || '/',
-        expires: cookie.expires,
-        httpOnly: cookie.httpOnly || false,
-        secure: cookie.secure || true,
-        sameSite: cookie.sameSite || 'None'
-      })));
+      // Set Facebook cookies one by one to avoid protocol errors
+      for (const cookie of cookies) {
+        try {
+          await page.setCookie({
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path || '/',
+            expires: cookie.expires ? cookie.expires : undefined,
+            httpOnly: cookie.httpOnly || false,
+            secure: cookie.secure !== false,
+            sameSite: (cookie.sameSite as 'Strict' | 'Lax' | 'None') || 'Lax'
+          });
+        } catch (cookieError) {
+          console.warn(`Failed to set cookie ${cookie.name}:`, cookieError);
+        }
+      }
       
       await page.reload({ waitUntil: 'networkidle0' });
       
@@ -329,16 +347,23 @@ export class BrowserAutomationService {
       
       await page.goto(baseUrl, { waitUntil: 'networkidle0' });
       
-      await page.setCookie(...cookies.map(cookie => ({
-        name: cookie.name,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path || '/',
-        expires: cookie.expires,
-        httpOnly: cookie.httpOnly || false,
-        secure: cookie.secure || true,
-        sameSite: cookie.sameSite || 'None'
-      })));
+      // Set cookies one by one to avoid protocol errors
+      for (const cookie of cookies) {
+        try {
+          await page.setCookie({
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path || '/',
+            expires: cookie.expires ? cookie.expires : undefined,
+            httpOnly: cookie.httpOnly || false,
+            secure: cookie.secure !== false,
+            sameSite: (cookie.sameSite as 'Strict' | 'Lax' | 'None') || 'Lax'
+          });
+        } catch (cookieError) {
+          console.warn(`Failed to set cookie ${cookie.name}:`, cookieError);
+        }
+      }
       
       await page.reload({ waitUntil: 'networkidle0' });
       
