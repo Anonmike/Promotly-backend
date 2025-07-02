@@ -13,9 +13,11 @@ export const socialAccounts = pgTable("social_accounts", {
   userId: integer("user_id").notNull(),
   platform: text("platform").notNull(), // twitter, facebook, linkedin, etc.
   accountId: text("account_id").notNull(),
-  accessToken: text("access_token").notNull(),
+  accessToken: text("access_token"),
   accessTokenSecret: text("access_token_secret"), // For OAuth 1.0a (Twitter)
   refreshToken: text("refresh_token"),
+  cookies: text("cookies"), // JSON string of cookies for headless automation
+  authMethod: text("auth_method").default("oauth"), // oauth or cookies
   expiresAt: timestamp("expires_at"),
   accountName: text("account_name").notNull(),
   isActive: boolean("is_active").default(true),

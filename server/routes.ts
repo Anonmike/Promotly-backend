@@ -334,6 +334,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add cookie-based authentication for an account
+  app.post("/api/social-accounts/cookies", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { platform, accountName, cookies } = req.body;
+      
+      if (!platform || !accountName || !cookies) {
+        return res.status(400).json({ message: "Platform, account name, and cookies are required" });
+      }
+
+      // Validate cookies first
+      const isValid = await socialMediaService.validateCookies(platform, cookies);
+      if (!isValid) {
+        return res.status(400).json({ message: "Invalid cookies - unable to authenticate with the platform" });
+      }
+
+      // Create or update social account with cookies
+      const accountData = {
+        userId: req.user.userId,
+        platform,
+        accountId: `cookie_${accountName}_${Date.now()}`,
+        accountName,
+        authMethod: 'cookies',
+        cookies: JSON.stringify(cookies),
+        accessToken: null, // Not needed for cookie auth
+        accessTokenSecret: null
+      };
+
+      const account = await storage.createSocialAccount(accountData);
+      res.json({ 
+        success: true, 
+        message: `${platform} account connected via cookies successfully!`,
+        account 
+      });
+    } catch (error) {
+      console.error('Cookie-based account creation error:', error);
+      res.status(500).json({ 
+        message: "Failed to connect account with cookies",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Refresh account status
   app.post("/api/social-accounts/:id/refresh", authenticateClerkToken, async (req: any, res) => {
     try {

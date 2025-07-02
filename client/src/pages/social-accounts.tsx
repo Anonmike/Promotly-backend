@@ -5,9 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink, Copy } from "lucide-react";
+import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink, Copy, Cookie } from "lucide-react";
 
 interface SocialAccount {
   id: number;
@@ -23,6 +25,12 @@ export default function SocialAccounts() {
   const { toast } = useToast();
   const [showOAuthComplete, setShowOAuthComplete] = useState(false);
   const [oauthVerifier, setOauthVerifier] = useState("");
+  const [showCookieForm, setShowCookieForm] = useState(false);
+  const [cookieFormData, setCookieFormData] = useState({
+    platform: '',
+    accountName: '',
+    cookies: ''
+  });
 
   // Check for connection success/error messages in URL
   useEffect(() => {
@@ -145,6 +153,40 @@ export default function SocialAccounts() {
     },
   });
 
+  const cookieAuthMutation = useMutation({
+    mutationFn: async (data: { platform: string; accountName: string; cookies: string }) => {
+      let cookies;
+      try {
+        cookies = JSON.parse(data.cookies);
+      } catch (error) {
+        throw new Error("Invalid cookie format. Please provide valid JSON.");
+      }
+
+      const response = await apiRequest("POST", "/api/social-accounts/cookies", {
+        platform: data.platform,
+        accountName: data.accountName,
+        cookies
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      setShowCookieForm(false);
+      setCookieFormData({ platform: '', accountName: '', cookies: '' });
+      toast({
+        title: "Success!",
+        description: data.message,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to connect account with cookies",
+        variant: "destructive",
+      });
+    },
+  });
+
   const platforms = [
     { id: "twitter", name: "Twitter/X", icon: Twitter, color: "bg-blue-500" },
     { id: "facebook", name: "Facebook", icon: Facebook, color: "bg-blue-600" },
@@ -190,16 +232,26 @@ export default function SocialAccounts() {
         <p className="text-gray-600 mt-2">Connect your social media accounts to Promotly to start scheduling posts</p>
       </div>
 
-      {/* Available Platforms */}
+      {/* Connection Methods */}
       <div className="grid gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Available Platforms</CardTitle>
+            <CardTitle>Connect Your Accounts</CardTitle>
             <CardDescription>
-              Connect your social media accounts using secure OAuth authentication
+              Choose your preferred authentication method for each platform
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
+            <Tabs defaultValue="oauth" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="oauth">OAuth Authentication</TabsTrigger>
+                <TabsTrigger value="cookies">Cookie Authentication</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="oauth" className="space-y-4 mt-6">
+                <div className="text-sm text-gray-600 mb-4">
+                  <p>Secure OAuth authentication allows Promotly to post on your behalf using official platform APIs.</p>
+                </div>
             {/* Twitter */}
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center space-x-3">
@@ -345,9 +397,108 @@ export default function SocialAccounts() {
               </div>
               <Badge variant="secondary">Coming Soon</Badge>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </TabsContent>
+          
+          <TabsContent value="cookies" className="space-y-4 mt-6">
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">Cookie authentication uses your browser cookies to post directly to social media platforms.</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-amber-800 font-medium mb-1">⚠️ Advanced Feature</p>
+                  <ul className="text-amber-700 text-xs space-y-1">
+                    <li>• More reliable than OAuth for some platforms</li>
+                    <li>• Requires manual cookie extraction from your browser</li>
+                    <li>• Cookies may expire and need periodic updates</li>
+                  </ul>
+                </div>
+              </div>
+              
+              {!showCookieForm ? (
+                <Button onClick={() => setShowCookieForm(true)} className="w-full">
+                  <Cookie className="h-4 w-4 mr-2" />
+                  Add Account with Cookies
+                </Button>
+              ) : (
+                <Card className="border-blue-200">
+                  <CardHeader>
+                    <CardTitle className="text-blue-900">Cookie Authentication Setup</CardTitle>
+                    <CardDescription>
+                      Follow the steps below to extract cookies from your browser
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="platform">Platform</Label>
+                      <select
+                        id="platform"
+                        className="w-full p-2 border rounded-md"
+                        value={cookieFormData.platform}
+                        onChange={(e) => setCookieFormData(prev => ({ ...prev, platform: e.target.value }))}
+                      >
+                        <option value="">Select Platform</option>
+                        <option value="twitter">Twitter/X</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="linkedin">LinkedIn</option>
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="accountName">Account Username</Label>
+                      <Input
+                        id="accountName"
+                        value={cookieFormData.accountName}
+                        onChange={(e) => setCookieFormData(prev => ({ ...prev, accountName: e.target.value }))}
+                        placeholder="e.g., @yourusername"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="cookies">Browser Cookies (JSON format)</Label>
+                      <Textarea
+                        id="cookies"
+                        value={cookieFormData.cookies}
+                        onChange={(e) => setCookieFormData(prev => ({ ...prev, cookies: e.target.value }))}
+                        placeholder='[{"name":"session_id","value":"abc123","domain":".twitter.com"}]'
+                        className="min-h-[100px] font-mono text-sm"
+                      />
+                      <div className="text-xs text-gray-500">
+                        <p>To extract cookies:</p>
+                        <ol className="list-decimal list-inside mt-1 space-y-1">
+                          <li>Open browser developer tools (F12)</li>
+                          <li>Go to the platform website and log in</li>
+                          <li>In Console tab, run: <code className="bg-gray-100 px-1 rounded">JSON.stringify(document.cookie.split(';').map(c => (...)))</code></li>
+                          <li>Copy the output and paste above</li>
+                        </ol>
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={() => cookieAuthMutation.mutate(cookieFormData)}
+                        disabled={!cookieFormData.platform || !cookieFormData.accountName || !cookieFormData.cookies || cookieAuthMutation.isPending}
+                        className="flex-1"
+                      >
+                        {cookieAuthMutation.isPending ? "Connecting..." : "Connect Account"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowCookieForm(false);
+                          setCookieFormData({ platform: '', accountName: '', cookies: '' });
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  </div>
 
       {/* Connected Accounts Summary */}
       {accounts.length > 0 && (

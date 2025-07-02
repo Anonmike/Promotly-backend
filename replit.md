@@ -179,6 +179,16 @@ Preferred communication style: Simple, everyday language.
   - Implemented connection warnings in post scheduler when accounts are disconnected
   - Users now get immediate feedback about account status and can refresh connections manually
 
+- **January 01, 2025**: Added headless browser automation with cookie authentication
+  - Built comprehensive Puppeteer-based automation for Twitter, Facebook, and LinkedIn posting
+  - Implemented cookie-based authentication as primary method or OAuth fallback
+  - Added intelligent automatic fallback from OAuth to cookies when tokens fail
+  - Extended database schema with cookie storage and authentication method tracking
+  - Created user-friendly cookie authentication interface with extraction instructions
+  - Added cookie validation before account creation to ensure successful authentication
+  - Enhanced account status monitoring with real-time connection validation
+  - Provides robust alternative when OAuth tokens expire or API access is limited
+
 ## Changelog
 
 - June 27, 2025: Initial setup

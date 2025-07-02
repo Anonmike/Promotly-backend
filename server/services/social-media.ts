@@ -1,6 +1,7 @@
 import { TwitterApi } from "twitter-api-v2";
 import axios from "axios";
 import type { Post, SocialAccount } from "@shared/schema";
+import { browserAutomationService, type CookieData } from "./browser-automation";
 
 export class SocialMediaService {
   private twitterClients: Map<string, TwitterApi> = new Map();
@@ -300,31 +301,76 @@ export class SocialMediaService {
       try {
         let postId: string;
         
-        switch (platform) {
-          case 'twitter':
-            postId = await this.postToTwitter(post, account);
-            break;
-          case 'facebook':
-            postId = await this.postToFacebook(post, account);
-            break;
-          case 'linkedin':
-            postId = await this.postToLinkedIn(post, account);
-            break;
-          case 'instagram':
-            postId = await this.postToInstagram(post, account);
-            break;
-          default:
-            throw new Error(`Unsupported platform: ${platform}`);
+        // Try cookie-based authentication if set as primary method
+        if (account.authMethod === 'cookies' && account.cookies) {
+          postId = await this.postWithCookies(post, account);
+        } else {
+          // Use traditional OAuth/API methods
+          switch (platform) {
+            case 'twitter':
+              postId = await this.postToTwitter(post, account);
+              break;
+            case 'facebook':
+              postId = await this.postToFacebook(post, account);
+              break;
+            case 'linkedin':
+              postId = await this.postToLinkedIn(post, account);
+              break;
+            case 'instagram':
+              postId = await this.postToInstagram(post, account);
+              break;
+            default:
+              throw new Error(`Unsupported platform: ${platform}`);
+          }
         }
         
         results[platform] = postId;
       } catch (error) {
         console.error(`Failed to post to ${platform}:`, error);
-        throw error;
+        
+        // If OAuth fails and we have cookies, try fallback
+        if (account.authMethod !== 'cookies' && account.cookies) {
+          try {
+            console.log(`Attempting cookie fallback for ${platform}`);
+            const postId = await this.postWithCookies(post, account);
+            results[platform] = postId;
+            console.log(`Cookie fallback successful for ${platform}`);
+          } catch (cookieError) {
+            console.error(`Cookie fallback also failed for ${platform}:`, cookieError);
+            throw error; // Throw original error
+          }
+        } else {
+          throw error; // Re-throw to handle at caller level
+        }
       }
     }
     
     return results;
+  }
+
+  // Post using cookie-based authentication
+  async postWithCookies(post: Post, account: SocialAccount): Promise<string> {
+    if (!account.cookies) {
+      throw new Error('No cookies available for headless automation');
+    }
+
+    const cookies: CookieData[] = JSON.parse(account.cookies);
+    
+    switch (account.platform) {
+      case "twitter":
+        return await browserAutomationService.postToTwitterWithCookies(post, cookies);
+      case "facebook":
+        return await browserAutomationService.postToFacebookWithCookies(post, cookies);
+      case "linkedin":
+        return await browserAutomationService.postToLinkedInWithCookies(post, cookies);
+      default:
+        throw new Error(`Cookie-based posting not supported for platform: ${account.platform}`);
+    }
+  }
+
+  // Validate cookies for a platform
+  async validateCookies(platform: string, cookies: CookieData[]): Promise<boolean> {
+    return await browserAutomationService.validateCookies(platform, cookies);
   }
 
   // Method to fetch analytics for published posts
