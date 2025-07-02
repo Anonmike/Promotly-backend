@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink, Copy, Cookie } from "lucide-react";
+import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink, Copy, Cookie, Globe } from "lucide-react";
 
 interface SocialAccount {
   id: number;
@@ -30,6 +30,13 @@ export default function SocialAccounts() {
     platform: '',
     accountName: '',
     cookies: ''
+  });
+  const [autoExtractState, setAutoExtractState] = useState({
+    isExtracting: false,
+    sessionId: '',
+    platform: '',
+    showComplete: false,
+    accountName: ''
   });
 
   // Check for connection success/error messages in URL
@@ -187,6 +194,69 @@ export default function SocialAccounts() {
     },
   });
 
+  const autoExtractStartMutation = useMutation({
+    mutationFn: async (platform: string) => {
+      const response = await apiRequest("POST", "/api/social-accounts/extract-cookies/start", { platform });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAutoExtractState({
+        isExtracting: true,
+        sessionId: data.sessionId,
+        platform: autoExtractState.platform,
+        showComplete: true,
+        accountName: ''
+      });
+      toast({
+        title: "Browser Opened",
+        description: `Please log in to ${autoExtractState.platform} in the browser window that just opened.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to start cookie extraction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const autoExtractCompleteMutation = useMutation({
+    mutationFn: async ({ sessionId, accountName }: { sessionId: string; accountName: string }) => {
+      const response = await apiRequest("POST", "/api/social-accounts/extract-cookies/complete", { 
+        sessionId, 
+        accountName 
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      setAutoExtractState({
+        isExtracting: false,
+        sessionId: '',
+        platform: '',
+        showComplete: false,
+        accountName: ''
+      });
+      toast({
+        title: "Success!",
+        description: data.message,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to complete cookie extraction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAutoExtract = (platform: string) => {
+    setAutoExtractState(prev => ({ ...prev, platform }));
+    autoExtractStartMutation.mutate(platform);
+  };
+
   const platforms = [
     { id: "twitter", name: "Twitter/X", icon: Twitter, color: "bg-blue-500" },
     { id: "facebook", name: "Facebook", icon: Facebook, color: "bg-blue-600" },
@@ -243,9 +313,10 @@ export default function SocialAccounts() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="oauth" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="oauth">OAuth Authentication</TabsTrigger>
-                <TabsTrigger value="cookies">Cookie Authentication</TabsTrigger>
+                <TabsTrigger value="auto-cookies">Auto Cookie Extract</TabsTrigger>
+                <TabsTrigger value="cookies">Manual Cookies</TabsTrigger>
               </TabsList>
               
               <TabsContent value="oauth" className="space-y-4 mt-6">
@@ -396,6 +467,137 @@ export default function SocialAccounts() {
                 </div>
               </div>
               <Badge variant="secondary">Coming Soon</Badge>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="auto-cookies" className="space-y-4 mt-6">
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">Automatic cookie extraction opens a browser window where you can log in, then extracts cookies automatically.</p>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-green-800 font-medium mb-1">✨ Recommended Method</p>
+                  <ul className="text-green-700 text-xs space-y-1">
+                    <li>• Easy and user-friendly - just log in normally</li>
+                    <li>• Automatically extracts all necessary cookies</li>
+                    <li>• No technical knowledge required</li>
+                    <li>• Most reliable authentication method</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Twitter Auto Extract */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-full bg-blue-500">
+                      <Twitter className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Twitter/X</h3>
+                      <p className="text-sm text-gray-600">Automatic login and cookie extraction</p>
+                    </div>
+                  </div>
+                  <Button onClick={() => handleAutoExtract('twitter')}>
+                    <Globe className="h-4 w-4 mr-2" />
+                    Auto Connect
+                  </Button>
+                </div>
+
+                {/* Facebook Auto Extract */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-full bg-blue-600">
+                      <Facebook className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Facebook</h3>
+                      <p className="text-sm text-gray-600">Automatic login and cookie extraction</p>
+                    </div>
+                  </div>
+                  <Button onClick={() => handleAutoExtract('facebook')}>
+                    <Globe className="h-4 w-4 mr-2" />
+                    Auto Connect
+                  </Button>
+                </div>
+
+                {/* LinkedIn Auto Extract */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-full bg-blue-700">
+                      <Linkedin className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">LinkedIn</h3>
+                      <p className="text-sm text-gray-600">Automatic login and cookie extraction</p>
+                    </div>
+                  </div>
+                  <Button onClick={() => handleAutoExtract('linkedin')}>
+                    <Globe className="h-4 w-4 mr-2" />
+                    Auto Connect
+                  </Button>
+                </div>
+              </div>
+
+              {/* Auto Extract Completion Dialog */}
+              {autoExtractState.showComplete && (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardHeader>
+                    <CardTitle className="text-blue-900">Complete Cookie Extraction</CardTitle>
+                    <CardDescription>
+                      Please complete the login process in the browser window, then return here.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 bg-blue-100 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">Instructions:</h4>
+                      <ol className="text-blue-800 text-sm space-y-1 list-decimal list-inside">
+                        <li>Log in to your {autoExtractState.platform} account in the browser window</li>
+                        <li>Make sure you can see your feed/dashboard</li>
+                        <li>Enter your account username below</li>
+                        <li>Click "Complete Connection" to extract cookies automatically</li>
+                      </ol>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="autoAccountName">Account Username</Label>
+                      <Input
+                        id="autoAccountName"
+                        placeholder="e.g., @yourusername"
+                        value={autoExtractState.accountName || ''}
+                        onChange={(e) => setAutoExtractState(prev => ({ ...prev, accountName: e.target.value }))}
+                      />
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={() => autoExtractCompleteMutation.mutate({
+                          sessionId: autoExtractState.sessionId,
+                          accountName: autoExtractState.accountName || ''
+                        })}
+                        disabled={!autoExtractState.accountName || autoExtractCompleteMutation.isPending}
+                        className="flex-1"
+                      >
+                        {autoExtractCompleteMutation.isPending ? "Extracting..." : "Complete Connection"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setAutoExtractState({
+                            isExtracting: false,
+                            sessionId: '',
+                            platform: '',
+                            showComplete: false,
+                            accountName: ''
+                          });
+                        }}
+                        disabled={autoExtractCompleteMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
           

@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import { socialMediaService } from "./services/social-media";
 import { scheduler } from "./services/scheduler";
+import { cookieExtractor } from "./services/cookie-extractor";
 
 const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -430,6 +431,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Account deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
+  // Automatic cookie extraction routes
+  app.post("/api/social-accounts/extract-cookies/start", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { platform } = req.body;
+      
+      if (!platform) {
+        return res.status(400).json({ message: "Platform is required" });
+      }
+
+      if (!['twitter', 'facebook', 'linkedin'].includes(platform)) {
+        return res.status(400).json({ message: "Unsupported platform" });
+      }
+
+      // Start the cookie extraction process
+      const result = await cookieExtractor.extractCookiesFromPlatform(platform);
+      
+      res.json({
+        success: true,
+        sessionId: result.sessionId,
+        message: `Browser opened for ${platform}. Please log in to your account in the browser window, then call the complete endpoint.`,
+        instructions: [
+          `1. A browser window should have opened to ${platform}'s login page`,
+          `2. Log in to your ${platform} account in that browser window`,
+          `3. Once logged in and you can see your feed/dashboard, call the complete endpoint with the sessionId`,
+          `4. Do not close the browser window until the process is complete`
+        ]
+      });
+    } catch (error) {
+      console.error('Cookie extraction start error:', error);
+      res.status(500).json({ 
+        message: "Failed to start cookie extraction",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post("/api/social-accounts/extract-cookies/complete", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { sessionId, accountName } = req.body;
+      
+      if (!sessionId || !accountName) {
+        return res.status(400).json({ message: "Session ID and account name are required" });
+      }
+
+      // Complete the cookie extraction
+      const cookies = await cookieExtractor.completeCookieExtraction(sessionId);
+      
+      if (cookies.length === 0) {
+        return res.status(400).json({ message: "No relevant cookies found. Make sure you're logged in." });
+      }
+
+      // Determine platform from cookies
+      let platform = '';
+      for (const cookie of cookies) {
+        if (cookie.domain.includes('x.com') || cookie.domain.includes('twitter.com')) {
+          platform = 'twitter';
+          break;
+        } else if (cookie.domain.includes('facebook.com')) {
+          platform = 'facebook';
+          break;
+        } else if (cookie.domain.includes('linkedin.com')) {
+          platform = 'linkedin';
+          break;
+        }
+      }
+
+      if (!platform) {
+        return res.status(400).json({ message: "Could not determine platform from cookies" });
+      }
+
+      // Create or update social account with extracted cookies
+      const accountData = {
+        userId: req.user.userId,
+        platform,
+        accountId: `auto_${accountName}_${Date.now()}`,
+        accountName,
+        authMethod: 'cookies',
+        cookies: JSON.stringify(cookies),
+        accessToken: null,
+        accessTokenSecret: null,
+        isActive: true
+      };
+
+      const account = await storage.createSocialAccount(accountData);
+
+      res.json({
+        success: true,
+        message: `Successfully connected ${platform} account using automatic cookie extraction`,
+        account: {
+          ...account,
+          cookies: undefined // Don't send cookies back in response
+        },
+        cookiesExtracted: cookies.length
+      });
+    } catch (error) {
+      console.error('Cookie extraction complete error:', error);
+      res.status(500).json({ 
+        message: "Failed to complete cookie extraction",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post("/api/social-accounts/extract-cookies/cancel", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      await cookieExtractor.cancelCookieExtraction(sessionId);
+      
+      res.json({
+        success: true,
+        message: "Cookie extraction cancelled successfully"
+      });
+    } catch (error) {
+      console.error('Cookie extraction cancel error:', error);
+      res.status(500).json({ 
+        message: "Failed to cancel cookie extraction",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

@@ -189,6 +189,16 @@ Preferred communication style: Simple, everyday language.
   - Enhanced account status monitoring with real-time connection validation
   - Provides robust alternative when OAuth tokens expire or API access is limited
 
+- **January 02, 2025**: Implemented automatic cookie extraction system
+  - Fixed Puppeteer protocol errors with partitionKey parameters in cookie handling
+  - Created automatic cookie extraction service that opens browser for user login
+  - Added three-tab authentication interface: OAuth, Auto Cookie Extract, Manual Cookies
+  - Built seamless user experience where users just log in normally and cookies are extracted automatically
+  - Added proper error handling for individual cookie failures during extraction
+  - Implemented session-based tracking for cookie extraction processes
+  - Enhanced UI with step-by-step instructions and completion dialogs
+  - Provides most user-friendly method for social media account authentication
+
 ## Changelog
 
 - June 27, 2025: Initial setup
