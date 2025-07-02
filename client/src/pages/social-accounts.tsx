@@ -466,7 +466,7 @@ export default function SocialAccounts() {
                         <ol className="list-decimal list-inside mt-1 space-y-1">
                           <li>Open browser developer tools (F12)</li>
                           <li>Go to the platform website and log in</li>
-                          <li>In Console tab, run: <code className="bg-gray-100 px-1 rounded">JSON.stringify(document.cookie.split(';').map(c => (...)))</code></li>
+                          <li>In Console tab, run: <code className="bg-gray-100 px-1 rounded">JSON.stringify(document.cookie.split(';').map(c =&gt; (...)))</code></li>
                           <li>Copy the output and paste above</li>
                         </ol>
                       </div>
