@@ -32,50 +32,38 @@ export class CookieExtractorService {
     }
   }
 
-  async extractCookiesFromPlatform(platform: string): Promise<{ cookies: CookieData[]; sessionId: string }> {
-    await this.initBrowser();
-    const page = await this.browser!.newPage();
+  async extractCookiesFromPlatform(platform: string): Promise<{ cookies: CookieData[]; sessionId: string; loginUrl: string }> {
+    let baseUrl: string;
     
-    try {
-      let baseUrl: string;
-      let loginIndicators: string[];
-      
-      switch (platform) {
-        case 'twitter':
-          baseUrl = 'https://x.com/login';
-          loginIndicators = ['[data-testid="tweetTextarea_0"]', '[aria-label*="Tweet text"]', '[data-testid="primaryColumn"]'];
-          break;
-        case 'facebook':
-          baseUrl = 'https://www.facebook.com/login';
-          loginIndicators = ['[data-testid="status-attachment-mentions-input"]', '[aria-label*="What\'s on your mind"]'];
-          break;
-        case 'linkedin':
-          baseUrl = 'https://www.linkedin.com/login';
-          loginIndicators = ['.share-box-feed-entry__trigger', '[data-test-id="share-box-header"]'];
-          break;
-        default:
-          throw new Error(`Unsupported platform: ${platform}`);
-      }
-
-      // Navigate to login page
-      await page.goto(baseUrl, { waitUntil: 'networkidle0' });
-      
-      // Generate a unique session ID for this extraction
-      const sessionId = `cookie-extract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Store page reference for later cookie extraction
-      (global as any).cookieExtractionSessions = (global as any).cookieExtractionSessions || {};
-      (global as any).cookieExtractionSessions[sessionId] = { page, platform };
-      
-      return { cookies: [], sessionId };
-      
-    } catch (error) {
-      await page.close();
-      throw error;
+    switch (platform) {
+      case 'twitter':
+        baseUrl = 'https://x.com/login';
+        break;
+      case 'facebook':
+        baseUrl = 'https://www.facebook.com/login';
+        break;
+      case 'linkedin':
+        baseUrl = 'https://www.linkedin.com/login';
+        break;
+      default:
+        throw new Error(`Unsupported platform: ${platform}`);
     }
+
+    // Generate a unique session ID for this extraction
+    const sessionId = `cookie-extract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Store session info for later completion
+    (global as any).cookieExtractionSessions = (global as any).cookieExtractionSessions || {};
+    (global as any).cookieExtractionSessions[sessionId] = { platform, created: Date.now() };
+    
+    return { 
+      cookies: [], 
+      sessionId,
+      loginUrl: baseUrl
+    };
   }
 
-  async completeCookieExtraction(sessionId: string): Promise<CookieData[]> {
+  async completeCookieExtraction(sessionId: string, cookiesJson: string): Promise<CookieData[]> {
     const sessions = (global as any).cookieExtractionSessions || {};
     const session = sessions[sessionId];
     
@@ -83,48 +71,27 @@ export class CookieExtractorService {
       throw new Error('Invalid or expired session ID');
     }
     
-    const { page, platform } = session;
+    const { platform } = session;
     
     try {
-      // Wait for login completion by checking for platform-specific indicators
-      let loginIndicators: string[];
-      
-      switch (platform) {
-        case 'twitter':
-          loginIndicators = ['[data-testid="tweetTextarea_0"]', '[aria-label*="Tweet text"]', '[data-testid="primaryColumn"]'];
-          break;
-        case 'facebook':
-          loginIndicators = ['[data-testid="status-attachment-mentions-input"]', '[aria-label*="What\'s on your mind"]'];
-          break;
-        case 'linkedin':
-          loginIndicators = ['.share-box-feed-entry__trigger', '[data-test-id="share-box-header"]'];
-          break;
-        default:
-          loginIndicators = [];
+      // Parse the cookies JSON provided by the user
+      let cookies: any[];
+      try {
+        cookies = JSON.parse(cookiesJson);
+      } catch (parseError) {
+        throw new Error('Invalid cookies format. Please provide valid JSON.');
       }
       
-      // Check if user is logged in by looking for these indicators
-      let isLoggedIn = false;
-      for (const indicator of loginIndicators) {
-        try {
-          await page.waitForSelector(indicator, { timeout: 2000 });
-          isLoggedIn = true;
-          break;
-        } catch (e) {
-          // Continue checking other indicators
-        }
+      if (!Array.isArray(cookies)) {
+        throw new Error('Cookies must be an array');
       }
-      
-      if (!isLoggedIn) {
-        throw new Error('User does not appear to be logged in. Please complete the login process first.');
-      }
-      
-      // Extract all cookies from the page
-      const cookies = await page.cookies();
       
       // Filter and format cookies for the specific platform
       const relevantCookies: CookieData[] = cookies
-        .filter(cookie => {
+        .filter((cookie: any) => {
+          if (!cookie.name || !cookie.value || !cookie.domain) {
+            return false;
+          }
           // Filter cookies based on platform domain
           switch (platform) {
             case 'twitter':
@@ -137,26 +104,28 @@ export class CookieExtractorService {
               return false;
           }
         })
-        .map(cookie => ({
+        .map((cookie: any) => ({
           name: cookie.name,
           value: cookie.value,
           domain: cookie.domain,
-          path: cookie.path,
-          expires: cookie.expires > 0 ? cookie.expires : undefined,
-          httpOnly: cookie.httpOnly,
-          secure: cookie.secure,
-          sameSite: cookie.sameSite as 'Strict' | 'Lax' | 'None'
+          path: cookie.path || '/',
+          expires: cookie.expires ? cookie.expires : undefined,
+          httpOnly: cookie.httpOnly || false,
+          secure: cookie.secure !== false,
+          sameSite: (cookie.sameSite as 'Strict' | 'Lax' | 'None') || 'Lax'
         }));
       
-      // Clean up
-      await page.close();
+      // Clean up session
       delete sessions[sessionId];
+      
+      if (relevantCookies.length === 0) {
+        throw new Error(`No relevant ${platform} cookies found. Make sure you logged in to the correct platform and extracted cookies from the right domain.`);
+      }
       
       return relevantCookies;
       
     } catch (error) {
-      // Clean up on error
-      await page.close();
+      // Clean up session on error
       delete sessions[sessionId];
       throw error;
     }

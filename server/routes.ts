@@ -453,12 +453,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         sessionId: result.sessionId,
-        message: `Browser opened for ${platform}. Please log in to your account in the browser window, then call the complete endpoint.`,
+        loginUrl: result.loginUrl,
+        message: `Please follow the instructions to extract cookies from ${platform}`,
         instructions: [
-          `1. A browser window should have opened to ${platform}'s login page`,
-          `2. Log in to your ${platform} account in that browser window`,
-          `3. Once logged in and you can see your feed/dashboard, call the complete endpoint with the sessionId`,
-          `4. Do not close the browser window until the process is complete`
+          `1. Open a new tab and go to: ${result.loginUrl}`,
+          `2. Log in to your ${platform} account`,
+          `3. Open browser developer tools (F12)`,
+          `4. Go to Application/Storage tab → Cookies`,
+          `5. Copy all cookies and paste them in the completion form`,
+          `6. Return here and complete the process`
         ]
       });
     } catch (error) {
@@ -472,14 +475,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/social-accounts/extract-cookies/complete", authenticateClerkToken, async (req: any, res) => {
     try {
-      const { sessionId, accountName } = req.body;
+      const { sessionId, accountName, cookies: cookiesJson } = req.body;
       
-      if (!sessionId || !accountName) {
-        return res.status(400).json({ message: "Session ID and account name are required" });
+      if (!sessionId || !accountName || !cookiesJson) {
+        return res.status(400).json({ message: "Session ID, account name, and cookies are required" });
       }
 
       // Complete the cookie extraction
-      const cookies = await cookieExtractor.completeCookieExtraction(sessionId);
+      const cookies = await cookieExtractor.completeCookieExtraction(sessionId, cookiesJson);
       
       if (cookies.length === 0) {
         return res.status(400).json({ message: "No relevant cookies found. Make sure you're logged in." });

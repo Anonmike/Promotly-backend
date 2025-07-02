@@ -36,7 +36,9 @@ export default function SocialAccounts() {
     sessionId: '',
     platform: '',
     showComplete: false,
-    accountName: ''
+    accountName: '',
+    loginUrl: '',
+    extractedCookies: ''
   });
 
   // Check for connection success/error messages in URL
@@ -205,11 +207,13 @@ export default function SocialAccounts() {
         sessionId: data.sessionId,
         platform: autoExtractState.platform,
         showComplete: true,
-        accountName: ''
+        accountName: '',
+        loginUrl: data.loginUrl,
+        extractedCookies: ''
       });
       toast({
-        title: "Browser Opened",
-        description: `Please log in to ${autoExtractState.platform} in the browser window that just opened.`,
+        title: "Ready for Login",
+        description: `Please open the login URL and follow the instructions to extract cookies.`,
       });
     },
     onError: (error) => {
@@ -222,10 +226,11 @@ export default function SocialAccounts() {
   });
 
   const autoExtractCompleteMutation = useMutation({
-    mutationFn: async ({ sessionId, accountName }: { sessionId: string; accountName: string }) => {
+    mutationFn: async ({ sessionId, accountName, cookies }: { sessionId: string; accountName: string; cookies: string }) => {
       const response = await apiRequest("POST", "/api/social-accounts/extract-cookies/complete", { 
         sessionId, 
-        accountName 
+        accountName,
+        cookies
       });
       return response.json();
     },
@@ -236,7 +241,9 @@ export default function SocialAccounts() {
         sessionId: '',
         platform: '',
         showComplete: false,
-        accountName: ''
+        accountName: '',
+        loginUrl: '',
+        extractedCookies: ''
       });
       toast({
         title: "Success!",
@@ -549,22 +556,47 @@ export default function SocialAccounts() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="p-4 bg-blue-100 rounded-lg">
-                      <h4 className="font-medium text-blue-900 mb-2">Instructions:</h4>
-                      <ol className="text-blue-800 text-sm space-y-1 list-decimal list-inside">
-                        <li>Log in to your {autoExtractState.platform} account in the browser window</li>
-                        <li>Make sure you can see your feed/dashboard</li>
-                        <li>Enter your account username below</li>
-                        <li>Click "Complete Connection" to extract cookies automatically</li>
+                      <h4 className="font-medium text-blue-900 mb-2">Step 1: Login</h4>
+                      <p className="text-blue-800 text-sm mb-2">Click the link below to login to your account:</p>
+                      <a 
+                        href={autoExtractState.loginUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline text-sm break-all"
+                      >
+                        {autoExtractState.loginUrl}
+                      </a>
+                    </div>
+
+                    <div className="p-4 bg-orange-100 rounded-lg">
+                      <h4 className="font-medium text-orange-900 mb-2">Step 2: Extract Cookies</h4>
+                      <ol className="text-orange-800 text-sm space-y-1 list-decimal list-inside">
+                        <li>After logging in, press F12 to open developer tools</li>
+                        <li>Go to Application tab (or Storage tab in Firefox)</li>
+                        <li>Click "Cookies" in the left sidebar</li>
+                        <li>Select the {autoExtractState.platform} domain</li>
+                        <li>Copy all cookies and paste them below</li>
                       </ol>
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="autoAccountName">Account Username</Label>
+                      <Label htmlFor="autoAccountName">Account Name</Label>
                       <Input
                         id="autoAccountName"
-                        placeholder="e.g., @yourusername"
+                        placeholder="e.g., My Business Account"
                         value={autoExtractState.accountName || ''}
                         onChange={(e) => setAutoExtractState(prev => ({ ...prev, accountName: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cookiesInput">Cookies (JSON format)</Label>
+                      <textarea
+                        id="cookiesInput"
+                        className="w-full h-24 p-2 border rounded resize-none font-mono text-xs"
+                        placeholder="Paste the cookies JSON here..."
+                        value={autoExtractState.extractedCookies}
+                        onChange={(e) => setAutoExtractState(prev => ({ ...prev, extractedCookies: e.target.value }))}
                       />
                     </div>
                     
@@ -572,9 +604,10 @@ export default function SocialAccounts() {
                       <Button
                         onClick={() => autoExtractCompleteMutation.mutate({
                           sessionId: autoExtractState.sessionId,
-                          accountName: autoExtractState.accountName || ''
+                          accountName: autoExtractState.accountName || '',
+                          cookies: autoExtractState.extractedCookies
                         })}
-                        disabled={!autoExtractState.accountName || autoExtractCompleteMutation.isPending}
+                        disabled={!autoExtractState.accountName || !autoExtractState.extractedCookies || autoExtractCompleteMutation.isPending}
                         className="flex-1"
                       >
                         {autoExtractCompleteMutation.isPending ? "Extracting..." : "Complete Connection"}
@@ -587,7 +620,9 @@ export default function SocialAccounts() {
                             sessionId: '',
                             platform: '',
                             showComplete: false,
-                            accountName: ''
+                            accountName: '',
+                            loginUrl: '',
+                            extractedCookies: ''
                           });
                         }}
                         disabled={autoExtractCompleteMutation.isPending}
