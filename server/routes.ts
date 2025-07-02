@@ -9,6 +9,7 @@ import { createClerkClient, verifyToken } from "@clerk/backend";
 import { socialMediaService } from "./services/social-media";
 import { scheduler } from "./services/scheduler";
 import { cookieExtractor } from "./services/cookie-extractor";
+import { browserSessionService } from "./services/browser-session";
 
 const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -447,22 +448,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Unsupported platform" });
       }
 
-      // Start the cookie extraction process
-      const result = await cookieExtractor.extractCookiesFromPlatform(platform);
+      // Start the browser session process
+      const session = browserSessionService.generateSession(platform, req.user.id);
       
       res.json({
         success: true,
-        sessionId: result.sessionId,
-        loginUrl: result.loginUrl,
-        message: `Please follow the instructions to extract cookies from ${platform}`,
-        instructions: [
-          `1. Open a new tab and go to: ${result.loginUrl}`,
-          `2. Log in to your ${platform} account`,
-          `3. Open browser developer tools (F12)`,
-          `4. Go to Application/Storage tab → Cookies`,
-          `5. Copy all cookies and paste them in the completion form`,
-          `6. Return here and complete the process`
-        ]
+        sessionId: session.sessionId,
+        loginUrl: session.loginUrl,
+        instructions: session.instructions,
+        expiresAt: session.expiresAt,
+        message: `Browser session created for ${platform}. Follow the instructions to authenticate.`
       });
     } catch (error) {
       console.error('Cookie extraction start error:', error);
