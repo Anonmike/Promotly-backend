@@ -1,30 +1,11 @@
 import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  fullName: text("full_name"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const userStats = pgTable("user_stats", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  totalPosts: integer("total_posts").default(0),
-  successfulPosts: integer("successful_posts").default(0),
-  failedPosts: integer("failed_posts").default(0),
-  totalEngagement: integer("total_engagement").default(0),
-  totalImpressions: integer("total_impressions").default(0),
-  connectedAccounts: integer("connected_accounts").default(0),
-  lastPostDate: timestamp("last_post_date"),
-  accountCreatedDate: timestamp("account_created_date").defaultNow(),
-  lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
 export const socialAccounts = pgTable("social_accounts", {
@@ -38,14 +19,7 @@ export const socialAccounts = pgTable("social_accounts", {
   expiresAt: timestamp("expires_at"),
   accountName: text("account_name").notNull(),
   isActive: boolean("is_active").default(true),
-  isConnected: boolean("is_connected").default(true),
-  lastValidated: timestamp("last_validated").defaultNow(),
-  postsCount: integer("posts_count").default(0),
-  successfulPosts: integer("successful_posts").default(0),
-  failedPosts: integer("failed_posts").default(0),
-  totalEngagement: integer("total_engagement").default(0),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const posts = pgTable("posts", {
@@ -76,62 +50,10 @@ export const analytics = pgTable("analytics", {
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
-// Relations
-export const usersRelations = relations(users, ({ one, many }) => ({
-  stats: one(userStats, {
-    fields: [users.id],
-    references: [userStats.userId],
-  }),
-  socialAccounts: many(socialAccounts),
-  posts: many(posts),
-}));
-
-export const userStatsRelations = relations(userStats, ({ one }) => ({
-  user: one(users, {
-    fields: [userStats.userId],
-    references: [users.id],
-  }),
-}));
-
-export const socialAccountsRelations = relations(socialAccounts, ({ one }) => ({
-  user: one(users, {
-    fields: [socialAccounts.userId],
-    references: [users.id],
-  }),
-}));
-
-export const postsRelations = relations(posts, ({ one, many }) => ({
-  user: one(users, {
-    fields: [posts.userId],
-    references: [users.id],
-  }),
-  analytics: many(analytics),
-}));
-
-export const analyticsRelations = relations(analytics, ({ one }) => ({
-  post: one(posts, {
-    fields: [analytics.postId],
-    references: [posts.id],
-  }),
-}));
-
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
-  email: true,
   password: true,
-  fullName: true,
-});
-
-export const insertUserStatsSchema = createInsertSchema(userStats).pick({
-  userId: true,
-  totalPosts: true,
-  successfulPosts: true,
-  failedPosts: true,
-  totalEngagement: true,
-  totalImpressions: true,
-  connectedAccounts: true,
-  lastPostDate: true,
 });
 
 export const insertSocialAccountSchema = createInsertSchema(socialAccounts).pick({
@@ -172,9 +94,6 @@ export const insertAnalyticsSchema = createInsertSchema(analytics).pick({
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
-
-export type InsertUserStats = z.infer<typeof insertUserStatsSchema>;
-export type UserStats = typeof userStats.$inferSelect;
 
 export type InsertSocialAccount = z.infer<typeof insertSocialAccountSchema>;
 export type SocialAccount = typeof socialAccounts.$inferSelect;

@@ -2,27 +2,116 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
-import { insertSocialAccountSchema, insertPostSchema } from "@shared/schema";
+import { insertUserSchema, insertSocialAccountSchema, insertPostSchema, platformSchema, postStatusSchema } from "@shared/schema";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { createClerkClient, verifyToken } from "@clerk/backend";
 import { socialMediaService } from "./services/social-media";
 import { scheduler } from "./services/scheduler";
-import { setupAuth, authenticateUser } from "./auth";
+
+const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
+const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
+
+// Middleware to verify Clerk token
+const authenticateClerkToken = async (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  try {
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY
+    });
+    
+    // Get or create user in our system
+    const clerkUser = await clerkClient.users.getUser(payload.sub);
+    let user = await storage.getUserByUsername(clerkUser.id);
+    
+    if (!user) {
+      // Create user in our system using Clerk ID as username
+      user = await storage.createUser({
+        username: clerkUser.id,
+        password: 'clerk_user' // Placeholder since Clerk handles auth
+      });
+    }
+    
+    req.user = { userId: user.id, username: user.username, clerkId: clerkUser.id };
+    next();
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid or expired token' });
+  }
+};
+
+// Legacy JWT middleware for backward compatibility
+const authenticateToken = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) {
+      return res.status(403).json({ message: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication routes and middleware
-  setupAuth(app);
-
-  // Get user stats endpoint
-  app.get("/api/user/stats", authenticateUser, async (req: any, res) => {
+  // Authentication routes
+  app.post("/api/auth/register", async (req, res) => {
     try {
-      const stats = await storage.getUserStats(req.user.userId);
-      res.json({ stats: stats || {} });
+      const { username, password } = insertUserSchema.parse(req.body);
+      
+      // Check if user exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Hash password and create user
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({ username, password: hashedPassword });
+
+      // Generate JWT token
+      const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET);
+
+      res.json({ token, user: { id: user.id, username: user.username } });
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch user stats" });
+      res.status(400).json({ message: "Invalid input data" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = insertUserSchema.parse(req.body);
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET);
+      res.json({ token, user: { id: user.id, username: user.username } });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid input data" });
     }
   });
 
   // Social account routes
-  app.get("/api/social-accounts", authenticateUser, async (req: any, res) => {
+  app.get("/api/social-accounts", authenticateClerkToken, async (req: any, res) => {
     try {
       const accounts = await storage.getSocialAccounts(req.user.userId);
       
@@ -35,13 +124,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (account.platform === 'twitter') {
             try {
               isConnected = await socialMediaService.validateTwitterToken(account);
-              // Update connection status in database
-              if (!isConnected) {
-                await storage.updateSocialAccount(account.id, { 
-                  isConnected: false,
-                  lastValidated: new Date()
-                });
-              }
             } catch (error) {
               console.error(`Error validating Twitter account ${account.accountName}:`, error);
               isConnected = false;
@@ -62,30 +144,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Twitter OAuth initialization
-  app.post("/api/auth/twitter/init", authenticateUser, async (req: any, res) => {
+  // Twitter OAuth routes
+  // Test endpoint to verify session persistence
+  app.get("/api/test/session", (req, res) => {
+    console.log('Session test:', {
+      sessionId: req.sessionID,
+      session: (req as any).session
+    });
+    res.json({ sessionId: req.sessionID, hasSession: !!(req as any).session });
+  });
+
+  app.post("/api/auth/twitter/init", authenticateClerkToken, async (req: any, res) => {
     try {
-      const result = await socialMediaService.initializeTwitterOAuth();
+      const oauthData = await socialMediaService.initializeTwitterOAuth();
       
-      // Store OAuth data in session for later verification
+      // Store OAuth tokens temporarily in session
       (req as any).session.twitterOAuth = {
-        oauthToken: result.oauthToken,
-        oauthTokenSecret: result.oauthTokenSecret,
+        oauthToken: oauthData.oauthToken,
+        oauthTokenSecret: oauthData.oauthTokenSecret,
         userId: req.user.userId
       };
-      
-      console.log('Stored Twitter OAuth in session:', {
+
+      console.log('Stored OAuth data in session:', {
         sessionId: req.sessionID,
-        userId: req.user.userId,
-        oauthToken: result.oauthToken
+        oauthToken: oauthData.oauthToken,
+        userId: req.user.userId
       });
 
-      res.json({
-        authUrl: result.authUrl,
-        message: "Authorization URL generated. Please complete the OAuth flow."
+      res.json({ 
+        authUrl: oauthData.authUrl,
+        oauthToken: oauthData.oauthToken,
+        message: "For localhost development, you'll need to manually complete the OAuth flow after authorization"
       });
     } catch (error) {
-      console.error('Twitter OAuth initialization error:', error);
+      console.error('Twitter OAuth init error:', error);
       res.status(500).json({ 
         message: "Failed to initialize Twitter OAuth",
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -93,27 +185,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Manual Twitter OAuth completion for localhost development
-  app.post("/api/auth/twitter/complete", authenticateUser, async (req: any, res) => {
+  // Manual OAuth completion for localhost development
+  app.post("/api/auth/twitter/complete", authenticateClerkToken, async (req: any, res) => {
     try {
       const { oauth_verifier } = req.body;
       
       if (!oauth_verifier) {
-        return res.status(400).json({ message: "OAuth verifier is required" });
+        return res.status(400).json({ message: "OAuth verifier required" });
       }
 
       // Retrieve stored OAuth data
       const oauthData = (req as any).session.twitterOAuth;
-      console.log('Manual completion session data:', {
+      if (!oauthData) {
+        return res.status(400).json({ message: "No OAuth session found. Please reinitialize Twitter OAuth." });
+      }
+
+      console.log('Manual OAuth completion:', {
         sessionId: req.sessionID,
         hasOAuthData: !!oauthData,
-        userId: req.user.userId,
-        sessionData: oauthData
+        verifier: oauth_verifier
       });
-
-      if (!oauthData || oauthData.userId !== req.user.userId) {
-        return res.status(400).json({ message: "Invalid OAuth session" });
-      }
 
       // Complete OAuth flow
       const result = await socialMediaService.completeTwitterOAuth(
@@ -124,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Store the Twitter account
       await storage.createSocialAccount({
-        userId: req.user.userId,
+        userId: oauthData.userId,
         platform: "twitter",
         accountId: result.userId,
         accountName: result.screenName,
@@ -152,7 +243,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Twitter OAuth callback for production
+  // Simple test callback to verify Twitter can reach our server
+  app.get("/api/auth/twitter/test", (req, res) => {
+    console.log('Twitter test callback received:', req.query);
+    res.send('Twitter callback test successful!');
+  });
+
   app.get("/api/auth/twitter/callback", async (req, res) => {
     console.log('Twitter callback received:', {
       query: req.query,
@@ -224,8 +320,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/social-accounts", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const accountData = insertSocialAccountSchema.parse({
+        ...req.body,
+        userId: req.user.userId
+      });
+
+      const account = await storage.createSocialAccount(accountData);
+      res.json({ account });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid account data" });
+    }
+  });
+
   // Refresh account status
-  app.post("/api/social-accounts/:id/refresh", authenticateUser, async (req: any, res) => {
+  app.post("/api/social-accounts/:id/refresh", authenticateClerkToken, async (req: any, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const accounts = await storage.getSocialAccounts(req.user.userId);
@@ -243,12 +353,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           isConnected = await socialMediaService.validateTwitterToken(account);
           statusMessage = isConnected ? "Twitter account is connected" : "Twitter account is disconnected. Please reconnect.";
-          
-          // Update connection status in database
-          await storage.updateSocialAccount(account.id, { 
-            isConnected,
-            lastValidated: new Date()
-          });
         } catch (error) {
           console.error(`Error validating Twitter account ${account.accountName}:`, error);
           isConnected = false;
@@ -272,21 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/social-accounts", authenticateUser, async (req: any, res) => {
-    try {
-      const accountData = insertSocialAccountSchema.parse({
-        ...req.body,
-        userId: req.user.userId
-      });
-
-      const account = await storage.createSocialAccount(accountData);
-      res.json({ account });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid account data" });
-    }
-  });
-
-  app.delete("/api/social-accounts/:id", authenticateUser, async (req: any, res) => {
+  app.delete("/api/social-accounts/:id", authenticateClerkToken, async (req: any, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const deleted = await storage.deleteSocialAccount(accountId);
@@ -302,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Post routes
-  app.get("/api/posts", authenticateUser, async (req: any, res) => {
+  app.get("/api/posts", authenticateClerkToken, async (req: any, res) => {
     try {
       const { status, platform, limit } = req.query;
       const filters: any = {};
@@ -318,57 +408,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/posts/schedule", authenticateUser, async (req: any, res) => {
+  app.post("/api/posts/schedule", authenticateClerkToken, async (req: any, res) => {
     try {
       console.log('Received post data:', req.body);
       
       const postData = insertPostSchema.parse({
         ...req.body,
         userId: req.user.userId,
+        status: "scheduled"
       });
 
       console.log('Parsed post data:', postData);
 
+      // Validate platforms
+      if (postData.platforms && postData.platforms.length > 0) {
+        for (const platform of postData.platforms) {
+          platformSchema.parse(platform);
+        }
+      }
+
       const post = await storage.createPost(postData);
-      res.json({ 
-        post,
-        message: "Post scheduled successfully"
-      });
+      res.json({ post });
     } catch (error) {
       console.error('Post scheduling error:', error);
-      
       if (error instanceof z.ZodError) {
-        res.status(400).json({ 
+        console.error('Zod validation errors:', error.errors);
+        return res.status(400).json({ 
           message: "Invalid post data", 
-          errors: error.errors 
-        });
-      } else {
-        res.status(500).json({ 
-          message: "Failed to schedule post",
-          error: error instanceof Error ? error.message : 'Unknown error'
+          errors: error.errors,
+          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
         });
       }
+      res.status(500).json({ 
+        message: "Failed to schedule post",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
-  app.put("/api/posts/:id", authenticateUser, async (req: any, res) => {
+  app.put("/api/posts/:id", authenticateToken, async (req: any, res) => {
     try {
       const postId = parseInt(req.params.id);
       const updates = req.body;
 
-      const post = await storage.updatePost(postId, updates);
-      
-      if (!post) {
+      // Validate status if provided
+      if (updates.status) {
+        postStatusSchema.parse(updates.status);
+      }
+
+      const updatedPost = await storage.updatePost(postId, updates);
+      if (!updatedPost) {
         return res.status(404).json({ message: "Post not found" });
       }
 
-      res.json({ post });
+      res.json({ post: updatedPost });
     } catch (error) {
-      res.status(500).json({ message: "Failed to update post" });
+      res.status(400).json({ message: "Invalid update data" });
     }
   });
 
-  app.delete("/api/posts/:id", authenticateUser, async (req: any, res) => {
+  app.delete("/api/posts/:id", authenticateClerkToken, async (req: any, res) => {
     try {
       const postId = parseInt(req.params.id);
       const deleted = await storage.deletePost(postId);
@@ -384,34 +483,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get("/api/analytics/user/summary", authenticateUser, async (req: any, res) => {
+  app.get("/api/analytics/:postId", authenticateClerkToken, async (req: any, res) => {
     try {
-      const stats = await storage.getUserStats(req.user.userId);
-      const accounts = await storage.getSocialAccounts(req.user.userId);
+      const postId = parseInt(req.params.postId);
+      const analytics = await storage.getAnalytics(postId);
+      res.json({ analytics });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  app.get("/api/analytics/user/summary", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { timeframe } = req.query;
+      const analytics = await storage.getUserAnalytics(req.user.userId, timeframe as string);
       
-      res.json({ 
-        summary: {
-          totalPosts: stats?.totalPosts || 0,
-          successfulPosts: stats?.successfulPosts || 0,
-          failedPosts: stats?.failedPosts || 0,
-          totalEngagement: stats?.totalEngagement || 0,
-          totalImpressions: stats?.totalImpressions || 0,
-          connectedAccounts: accounts.length,
-          platforms: accounts.map(acc => acc.platform)
-        }
-      });
+      // Calculate summary statistics
+      const summary = {
+        totalPosts: analytics.length,
+        totalLikes: analytics.reduce((sum, a) => sum + (a.likes || 0), 0),
+        totalShares: analytics.reduce((sum, a) => sum + (a.shares || 0), 0),
+        totalComments: analytics.reduce((sum, a) => sum + (a.comments || 0), 0),
+        totalImpressions: analytics.reduce((sum, a) => sum + (a.impressions || 0), 0),
+        avgEngagementRate: analytics.length > 0 
+          ? analytics.reduce((sum, a) => sum + (a.engagementRate || 0), 0) / analytics.length 
+          : 0
+      };
+
+      res.json({ summary, analytics });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch analytics summary" });
     }
   });
 
-  app.get("/api/analytics/user", authenticateUser, async (req: any, res) => {
+  // Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "healthy", 
+      timestamp: new Date().toISOString(),
+      scheduler: scheduler.isRunning() ? "running" : "stopped"
+    });
+  });
+
+  // Social media OAuth callback endpoints (simplified)
+  app.get("/api/auth/:platform/callback", authenticateClerkToken, async (req: any, res) => {
     try {
-      const { timeframe } = req.query;
-      const analytics = await storage.getUserAnalytics(req.user.userId, timeframe as string);
-      res.json({ analytics });
+      const { platform } = req.params;
+      const { code } = req.query;
+
+      if (!code) {
+        return res.status(400).json({ message: "Authorization code required" });
+      }
+
+      // This would handle OAuth flow for each platform
+      // For now, return success message
+      res.json({ 
+        message: `${platform} authorization successful`,
+        platform,
+        code 
+      });
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch user analytics" });
+      res.status(500).json({ message: "OAuth callback failed" });
     }
   });
 

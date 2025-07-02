@@ -22,7 +22,6 @@ export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-
   const { notificationCount, failedPosts, recentSuccessfulPosts } = useNotifications();
 
   const navItems = [
