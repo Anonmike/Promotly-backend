@@ -5,7 +5,6 @@ import SchedulePost from "@/pages/schedule-post";
 import Posts from "@/pages/posts";
 import Analytics from "@/pages/analytics";
 import SocialAccounts from "@/pages/social-accounts";
-import Recommendations from "@/pages/recommendations";
 import NotFound from "@/pages/not-found";
 import { useNotifications } from "@/hooks/use-notifications";
 
@@ -22,7 +21,6 @@ export default function AuthenticatedApp() {
           <Route path="/schedule" component={SchedulePost} />
           <Route path="/posts" component={Posts} />
           <Route path="/analytics" component={Analytics} />
-          <Route path="/recommendations" component={Recommendations} />
           <Route path="/accounts" component={SocialAccounts} />
           <Route path="/social-accounts" component={SocialAccounts} />
           <Route component={NotFound} />

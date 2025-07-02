@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Switch, Route, Redirect } from "wouter";
-import { SignedIn, SignedOut, SignIn, SignUp, useAuth } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { useEffect } from "react";
 
 import HomePage from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
 import AuthenticatedApp from "@/components/layout/authenticated-app";
+import AuthPage from "@/pages/auth";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { setClerkTokenGetter } from "@/lib/queryClient";
@@ -28,22 +29,15 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
-      <Route path="/signin">
-        <div className="flex items-center justify-center min-h-screen">
-          <SignIn fallbackRedirectUrl="/" />
-        </div>
-      </Route>
-      <Route path="/signup">
-        <div className="flex items-center justify-center min-h-screen">
-          <SignUp fallbackRedirectUrl="/" />
-        </div>
-      </Route>
+      <Route path="/auth" component={AuthPage} />
+      <Route path="/signin" component={AuthPage} />
+      <Route path="/signup" component={AuthPage} />
       <Route path="/">
         <SignedIn>
           <AuthenticatedApp />
         </SignedIn>
         <SignedOut>
-          <Redirect to="/signin" />
+          <Redirect to="/auth" />
         </SignedOut>
       </Route>
       <Route path="/dashboard">
@@ -51,7 +45,7 @@ function Router() {
           <HomePage />
         </SignedIn>
         <SignedOut>
-          <Redirect to="/signin" />
+          <Redirect to="/auth" />
         </SignedOut>
       </Route>
       <Route path="/posts">
@@ -59,7 +53,7 @@ function Router() {
           <AuthenticatedApp />
         </SignedIn>
         <SignedOut>
-          <Redirect to="/signin" />
+          <Redirect to="/auth" />
         </SignedOut>
       </Route>
       <Route path="/schedule-post">
@@ -67,7 +61,7 @@ function Router() {
           <AuthenticatedApp />
         </SignedIn>
         <SignedOut>
-          <Redirect to="/signin" />
+          <Redirect to="/auth" />
         </SignedOut>
       </Route>
       <Route path="/analytics">
@@ -75,7 +69,7 @@ function Router() {
           <AuthenticatedApp />
         </SignedIn>
         <SignedOut>
-          <Redirect to="/signin" />
+          <Redirect to="/auth" />
         </SignedOut>
       </Route>
       <Route path="/social-accounts">
@@ -83,15 +77,7 @@ function Router() {
           <AuthenticatedApp />
         </SignedIn>
         <SignedOut>
-          <Redirect to="/signin" />
-        </SignedOut>
-      </Route>
-      <Route path="/recommendations">
-        <SignedIn>
-          <AuthenticatedApp />
-        </SignedIn>
-        <SignedOut>
-          <Redirect to="/signin" />
+          <Redirect to="/auth" />
         </SignedOut>
       </Route>
       <Route component={NotFound} />

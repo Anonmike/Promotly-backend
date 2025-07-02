@@ -1,9 +1,4 @@
-import { 
-  users, userStats, socialAccounts, posts, analytics, contentRecommendations, userPreferences, contentPerformance,
-  type User, type InsertUser, type UserStats, type InsertUserStats, type SocialAccount, type InsertSocialAccount, 
-  type Post, type InsertPost, type Analytics, type InsertAnalytics, type ContentRecommendation, type InsertContentRecommendation,
-  type UserPreferences, type InsertUserPreferences, type ContentPerformance, type InsertContentPerformance
-} from "@shared/schema";
+import { users, userStats, socialAccounts, posts, analytics, type User, type InsertUser, type UserStats, type InsertUserStats, type SocialAccount, type InsertSocialAccount, type Post, type InsertPost, type Analytics, type InsertAnalytics } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
 
@@ -39,20 +34,6 @@ export interface IStorage {
   createAnalytics(analytics: InsertAnalytics): Promise<Analytics>;
   updateAnalytics(id: number, updates: Partial<Analytics>): Promise<Analytics | undefined>;
   getUserAnalytics(userId: number, timeframe?: string): Promise<Analytics[]>;
-
-  // Content recommendation operations
-  getContentRecommendations(userId: number, includeUsed?: boolean): Promise<ContentRecommendation[]>;
-  createContentRecommendation(recommendation: InsertContentRecommendation): Promise<ContentRecommendation>;
-  updateContentRecommendation(id: number, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation | undefined>;
-
-  // User preferences operations
-  getUserPreferences(userId: number): Promise<UserPreferences | undefined>;
-  createUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
-  updateUserPreferences(userId: number, updates: Partial<UserPreferences>): Promise<UserPreferences | undefined>;
-
-  // Content performance operations
-  getContentPerformance(userId: number): Promise<ContentPerformance[]>;
-  createContentPerformance(performance: InsertContentPerformance): Promise<ContentPerformance>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -318,80 +299,6 @@ export class DatabaseStorage implements IStorage {
     
     const results = await query.orderBy(desc(analytics.lastUpdated));
     return results.map(result => result.analytics);
-  }
-
-  // Content recommendation operations
-  async getContentRecommendations(userId: number, includeUsed: boolean = false): Promise<ContentRecommendation[]> {
-    let query = db
-      .select()
-      .from(contentRecommendations)
-      .where(eq(contentRecommendations.userId, userId));
-    
-    if (!includeUsed) {
-      query = query.where(eq(contentRecommendations.isUsed, false));
-    }
-    
-    return await query.orderBy(desc(contentRecommendations.createdAt));
-  }
-
-  async createContentRecommendation(recommendation: InsertContentRecommendation): Promise<ContentRecommendation> {
-    const [created] = await db
-      .insert(contentRecommendations)
-      .values(recommendation)
-      .returning();
-    return created;
-  }
-
-  async updateContentRecommendation(id: number, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation | undefined> {
-    const [updated] = await db
-      .update(contentRecommendations)
-      .set(updates)
-      .where(eq(contentRecommendations.id, id))
-      .returning();
-    return updated || undefined;
-  }
-
-  // User preferences operations
-  async getUserPreferences(userId: number): Promise<UserPreferences | undefined> {
-    const [preferences] = await db
-      .select()
-      .from(userPreferences)
-      .where(eq(userPreferences.userId, userId));
-    return preferences || undefined;
-  }
-
-  async createUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences> {
-    const [created] = await db
-      .insert(userPreferences)
-      .values(preferences)
-      .returning();
-    return created;
-  }
-
-  async updateUserPreferences(userId: number, updates: Partial<UserPreferences>): Promise<UserPreferences | undefined> {
-    const [updated] = await db
-      .update(userPreferences)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(userPreferences.userId, userId))
-      .returning();
-    return updated || undefined;
-  }
-
-  // Content performance operations
-  async getContentPerformance(userId: number): Promise<ContentPerformance[]> {
-    return await db
-      .select()
-      .from(contentPerformance)
-      .where(eq(contentPerformance.userId, userId))
-      .orderBy(desc(contentPerformance.lastCalculated));
-  }
-
-  async createContentPerformance(performance: InsertContentPerformance): Promise<ContentPerformance> {
-    const [created] = await db
-      .insert(contentPerformance)
-      .values(performance)
-      .returning();
-    return created;
   }
 }
 

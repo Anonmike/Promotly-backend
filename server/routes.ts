@@ -5,7 +5,6 @@ import { storage } from "./storage";
 import { insertSocialAccountSchema, insertPostSchema } from "@shared/schema";
 import { socialMediaService } from "./services/social-media";
 import { scheduler } from "./services/scheduler";
-import { aiRecommendationEngine } from "./services/ai-recommendations";
 import { setupAuth, authenticateUser } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -413,105 +412,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ analytics });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user analytics" });
-    }
-  });
-
-  // Content recommendation routes
-  app.get("/api/recommendations", authenticateUser, async (req: any, res) => {
-    try {
-      const { includeUsed = false, limit = 5 } = req.query;
-      
-      // Get existing recommendations from database
-      const existingRecommendations = await storage.getContentRecommendations(
-        req.user.userId, 
-        includeUsed === 'true'
-      );
-      
-      // If we have enough unused recommendations, return them
-      if (existingRecommendations.length >= parseInt(limit)) {
-        return res.json({ 
-          recommendations: existingRecommendations.slice(0, parseInt(limit))
-        });
-      }
-      
-      // Generate new recommendations if needed
-      const newRecommendations = await aiRecommendationEngine.generateRecommendations(
-        req.user.userId,
-        parseInt(limit) - existingRecommendations.length
-      );
-      
-      // Combine existing and new recommendations
-      const allRecommendations = [...existingRecommendations, ...newRecommendations]
-        .slice(0, parseInt(limit));
-      
-      res.json({ recommendations: allRecommendations });
-    } catch (error) {
-      console.error('Error fetching recommendations:', error);
-      res.status(500).json({ message: "Failed to fetch content recommendations" });
-    }
-  });
-
-  app.post("/api/recommendations/:id/use", authenticateUser, async (req: any, res) => {
-    try {
-      const recommendationId = parseInt(req.params.id);
-      await aiRecommendationEngine.markRecommendationAsUsed(recommendationId);
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error marking recommendation as used:', error);
-      res.status(500).json({ message: "Failed to mark recommendation as used" });
-    }
-  });
-
-  app.get("/api/user/preferences", authenticateUser, async (req: any, res) => {
-    try {
-      const preferences = await storage.getUserPreferences(req.user.userId);
-      res.json({ preferences });
-    } catch (error) {
-      console.error('Error fetching user preferences:', error);
-      res.status(500).json({ message: "Failed to fetch user preferences" });
-    }
-  });
-
-  app.post("/api/user/preferences", authenticateUser, async (req: any, res) => {
-    try {
-      const preferences = await storage.createUserPreferences({
-        ...req.body,
-        userId: req.user.userId
-      });
-      res.json({ preferences });
-    } catch (error) {
-      console.error('Error creating user preferences:', error);
-      res.status(500).json({ message: "Failed to create user preferences" });
-    }
-  });
-
-  app.put("/api/user/preferences", authenticateUser, async (req: any, res) => {
-    try {
-      const preferences = await storage.updateUserPreferences(req.user.userId, req.body);
-      res.json({ preferences });
-    } catch (error) {
-      console.error('Error updating user preferences:', error);
-      res.status(500).json({ message: "Failed to update user preferences" });
-    }
-  });
-
-  app.get("/api/analytics/performance", authenticateUser, async (req: any, res) => {
-    try {
-      const performance = await storage.getContentPerformance(req.user.userId);
-      res.json({ performance });
-    } catch (error) {
-      console.error('Error fetching content performance:', error);
-      res.status(500).json({ message: "Failed to fetch content performance" });
-    }
-  });
-
-  app.post("/api/analytics/refresh", authenticateUser, async (req: any, res) => {
-    try {
-      await aiRecommendationEngine.updateContentPerformance(req.user.userId);
-      res.json({ success: true, message: "Content performance updated successfully" });
-    } catch (error) {
-      console.error('Error refreshing analytics:', error);
-      res.status(500).json({ message: "Failed to refresh analytics" });
     }
   });
 
