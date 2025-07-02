@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import { execSync } from 'child_process';
 import type { Post, SocialAccount } from "@shared/schema";
 
 export interface CookieData {
@@ -15,21 +16,56 @@ export interface CookieData {
 export class BrowserAutomationService {
   private browser: puppeteer.Browser | null = null;
 
+  private findChromiumPath(): string | null {
+    try {
+      // Try to find chromium in the system
+      const result = execSync('which chromium', { encoding: 'utf8' });
+      return result.trim();
+    } catch (error) {
+      return null;
+    }
+  }
+
   async initBrowser(): Promise<void> {
     if (!this.browser) {
-      this.browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-gpu'
-        ]
-      });
+      const chromiumPath = this.findChromiumPath();
+      
+      try {
+        // Try to launch with system Chromium first
+        this.browser = await puppeteer.launch({
+          headless: true,
+          executablePath: chromiumPath || undefined,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+          ]
+        });
+      } catch (error) {
+        // Fallback to default Puppeteer Chrome
+        try {
+          this.browser = await puppeteer.launch({
+            headless: true,
+            args: [
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-accelerated-2d-canvas',
+              '--no-first-run',
+              '--no-zygote',
+              '--single-process',
+              '--disable-gpu'
+            ]
+          });
+        } catch (fallbackError) {
+          throw new Error(`Failed to launch browser: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}. Please ensure Chrome is installed or run: npx puppeteer browsers install chrome`);
+        }
+      }
     }
   }
 
