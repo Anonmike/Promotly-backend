@@ -835,6 +835,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Playwright Browser Automation API Routes
+  
+  // Start browser onboarding for a platform
+  app.post("/api/browser/onboard", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { platform } = req.body;
+      
+      if (!platform || !['linkedin', 'twitter', 'facebook'].includes(platform)) {
+        return res.status(400).json({ 
+          message: "Valid platform required (linkedin, twitter, facebook)" 
+        });
+      }
+      
+      const result = await socialMediaService.startPlaywrightOnboarding(req.user.userId, platform);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          message: result.message,
+          platform,
+          instructions: [
+            "A browser window has opened for manual login",
+            "Complete the login process in the browser window",
+            "The session will be saved automatically for future automation",
+            "You can close this window once logged in successfully"
+          ]
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: result.message
+        });
+      }
+    } catch (error: any) {
+      console.error('Browser onboarding error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to start browser onboarding" 
+      });
+    }
+  });
+  
+  // Validate browser session for a platform
+  app.post("/api/browser/validate", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { platform } = req.body;
+      
+      if (!platform || !['linkedin', 'twitter', 'facebook'].includes(platform)) {
+        return res.status(400).json({ 
+          message: "Valid platform required (linkedin, twitter, facebook)" 
+        });
+      }
+      
+      // Find existing social account
+      const account = await storage.getSocialAccount(req.user.userId, platform);
+      if (!account) {
+        return res.status(404).json({
+          success: false,
+          message: `No ${platform} account found. Please add the account first.`
+        });
+      }
+      
+      const result = await socialMediaService.validatePlaywrightSession(account);
+      
+      res.json({
+        success: true,
+        platform,
+        isValid: result.isValid,
+        message: result.error || (result.isValid ? "Session is valid" : "Session expired"),
+        needsReauth: !result.isValid
+      });
+    } catch (error: any) {
+      console.error('Browser validation error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to validate browser session" 
+      });
+    }
+  });
+  
+  // Get browser session status for all platforms
+  app.get("/api/browser/sessions", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const platforms = ['linkedin', 'twitter', 'facebook'];
+      const sessions = [];
+      
+      for (const platform of platforms) {
+        try {
+          const account = await storage.getSocialAccount(req.user.userId, platform);
+          if (account && account.authMethod === 'browser_session') {
+            const validation = await socialMediaService.validatePlaywrightSession(account);
+            sessions.push({
+              platform,
+              accountName: account.accountName,
+              isValid: validation.isValid,
+              lastValidated: new Date().toISOString(),
+              authMethod: 'browser_session'
+            });
+          }
+        } catch (error) {
+          console.error(`Error checking ${platform} session:`, error);
+        }
+      }
+      
+      res.json({
+        success: true,
+        sessions,
+        totalSessions: sessions.length
+      });
+    } catch (error: any) {
+      console.error('Browser sessions error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to get browser sessions" 
+      });
+    }
+  });
+  
+  // Create or update social account to use browser session
+  app.post("/api/browser/connect", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { platform, accountName } = req.body;
+      
+      if (!platform || !['linkedin', 'twitter', 'facebook'].includes(platform)) {
+        return res.status(400).json({ 
+          message: "Valid platform required (linkedin, twitter, facebook)" 
+        });
+      }
+      
+      // Check if account already exists
+      const existingAccount = await storage.getSocialAccount(req.user.userId, platform);
+      
+      if (existingAccount) {
+        // Update existing account to use browser session
+        await storage.updateSocialAccount(existingAccount.id, {
+          authMethod: 'browser_session',
+          accountName: accountName || `${platform} Browser Session`,
+          isActive: true
+        });
+      } else {
+        // Create new account with browser session
+        await storage.createSocialAccount({
+          userId: req.user.userId,
+          platform,
+          accountId: `browser_${req.user.userId}_${platform}`,
+          accountName: accountName || `${platform} Browser Session`,
+          authMethod: 'browser_session',
+          isActive: true
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: `${platform} account connected with browser session`,
+        platform,
+        authMethod: 'browser_session'
+      });
+    } catch (error: any) {
+      console.error('Browser connect error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to connect browser session" 
+      });
+    }
+  });
+
   // Start the scheduler
   scheduler.start();
 

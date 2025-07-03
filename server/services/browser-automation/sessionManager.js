@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { chromium, Browser, BrowserContext } from 'playwright';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,10 +10,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * 
  * This module manages persistent browser sessions with unique user data directories.
  * Each user gets their own isolated browser context that persists between sessions.
+ * Integrated with Promotly's database for session tracking.
  */
-export class SessionManager {
+export class BrowserSessionManager {
   constructor() {
-    this.sessionsDir = path.join(__dirname, 'user_sessions');
+    this.sessionsDir = path.join(__dirname, '../../../user_sessions');
     this.activeSessions = new Map(); // Track active browser instances
   }
 

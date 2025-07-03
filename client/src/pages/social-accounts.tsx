@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink, Copy, Cookie, Globe } from "lucide-react";
+import { Twitter, Facebook, Linkedin, Trash2, CheckCircle, AlertCircle, ExternalLink, Copy, Cookie, Globe, Monitor, Play, RefreshCw } from "lucide-react";
 
 interface SocialAccount {
   id: number;
@@ -264,6 +264,168 @@ export default function SocialAccounts() {
     autoExtractStartMutation.mutate(platform);
   };
 
+  // Browser automation state and mutations
+  const [browserState, setBrowserState] = useState({
+    isOnboarding: false,
+    platform: '',
+    validating: false
+  });
+
+  const browserOnboardMutation = useMutation({
+    mutationFn: async (platform: string) => {
+      const response = await apiRequest("/api/browser/onboard", {
+        method: "POST",
+        body: JSON.stringify({ platform })
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Browser Window Opened",
+        description: `Please complete login for ${data.platform} in the browser window that opened.`,
+      });
+      setBrowserState(prev => ({ ...prev, isOnboarding: false }));
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to start browser onboarding",
+        variant: "destructive",
+      });
+      setBrowserState(prev => ({ ...prev, isOnboarding: false }));
+    },
+  });
+
+  const browserValidateMutation = useMutation({
+    mutationFn: async (platform: string) => {
+      const response = await apiRequest("/api/browser/validate", {
+        method: "POST",
+        body: JSON.stringify({ platform })
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: data.isValid ? "Session Valid" : "Session Expired",
+        description: data.message,
+        variant: data.isValid ? "default" : "destructive",
+      });
+      setBrowserState(prev => ({ ...prev, validating: false }));
+      queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to validate session",
+        variant: "destructive",
+      });
+      setBrowserState(prev => ({ ...prev, validating: false }));
+    },
+  });
+
+  const browserConnectMutation = useMutation({
+    mutationFn: async (platform: string) => {
+      const response = await apiRequest("/api/browser/connect", {
+        method: "POST",
+        body: JSON.stringify({ platform, accountName: `${platform} Browser Session` })
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Account Connected",
+        description: `${data.platform} account connected with browser automation`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to connect account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const BrowserAutomationSection = () => {
+    return (
+      <div className="space-y-4">
+        {platforms.map((platform) => {
+          const account = accounts.find(acc => acc.platform === platform.id);
+          const hasBrowserSession = account?.authMethod === 'browser_session';
+          
+          return (
+            <div key={platform.id} className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className={`p-2 rounded-full ${platform.color}`}>
+                  <platform.icon className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">{platform.name}</h3>
+                  <p className="text-sm text-gray-600">
+                    {hasBrowserSession ? "Browser session ready for automation" : "Login once to enable automated posting"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {hasBrowserSession ? (
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="default" className="flex items-center space-x-1">
+                      <Monitor className="h-3 w-3" />
+                      <span>Browser Connected</span>
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setBrowserState(prev => ({ ...prev, validating: true, platform: platform.id }));
+                        browserValidateMutation.mutate(platform.id);
+                      }}
+                      disabled={browserState.validating && browserState.platform === platform.id}
+                    >
+                      {browserState.validating && browserState.platform === platform.id ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      setBrowserState(prev => ({ ...prev, isOnboarding: true, platform: platform.id }));
+                      browserOnboardMutation.mutate(platform.id);
+                    }}
+                    disabled={browserState.isOnboarding && browserState.platform === platform.id}
+                    className="flex items-center space-x-2"
+                  >
+                    {browserState.isOnboarding && browserState.platform === platform.id ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="h-4 w-4" />
+                    )}
+                    <span>Start Login</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        
+        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+          <h4 className="font-semibold text-blue-900 mb-2">How Browser Automation Works</h4>
+          <ol className="text-sm text-blue-800 space-y-1">
+            <li>1. Click "Start Login" to open a browser window</li>
+            <li>2. Log into your social media account normally</li>
+            <li>3. Close the browser when you're done</li>
+            <li>4. Promotly will use this session for automated posting</li>
+            <li>5. Sessions persist between application restarts</li>
+          </ol>
+        </div>
+      </div>
+    );
+  };
+
   const platforms = [
     { id: "twitter", name: "Twitter/X", icon: Twitter, color: "bg-blue-500" },
     { id: "facebook", name: "Facebook", icon: Facebook, color: "bg-blue-600" },
@@ -319,12 +481,22 @@ export default function SocialAccounts() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="oauth" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+            <Tabs defaultValue="browser" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="browser">Browser Automation</TabsTrigger>
                 <TabsTrigger value="oauth">OAuth Authentication</TabsTrigger>
                 <TabsTrigger value="auto-cookies">Auto Cookie Extract</TabsTrigger>
                 <TabsTrigger value="cookies">Manual Cookies</TabsTrigger>
               </TabsList>
+              
+              <TabsContent value="browser" className="space-y-4 mt-6">
+                <div className="text-sm text-gray-600 mb-4">
+                  <p><strong>New!</strong> Browser Automation uses persistent browser sessions for reliable posting. Log in once manually, then Promotly handles the rest automatically.</p>
+                  <p className="mt-2 text-green-600">✓ Most reliable method ✓ Works with any platform ✓ No API limitations</p>
+                </div>
+                
+                <BrowserAutomationSection />
+              </TabsContent>
               
               <TabsContent value="oauth" className="space-y-4 mt-6">
                 <div className="text-sm text-gray-600 mb-4">

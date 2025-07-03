@@ -2,6 +2,7 @@ import { TwitterApi } from "twitter-api-v2";
 import axios from "axios";
 import type { Post, SocialAccount } from "@shared/schema";
 import { browserAutomationService, type CookieData } from "./browser-automation";
+import { playwrightAutomation } from "./playwright-automation";
 
 export class SocialMediaService {
   private twitterClients: Map<string, TwitterApi> = new Map();
@@ -299,13 +300,39 @@ export class SocialMediaService {
       }
 
       try {
-        let postId: string;
+        let postId: string | undefined = undefined;
+        let authError: Error | null = null;
         
-        // Try cookie-based authentication if set as primary method
-        if (account.authMethod === 'cookies' && account.cookies) {
-          postId = await this.postWithCookies(post, account);
-        } else {
-          // Use traditional OAuth/API methods
+        // Try browser session first if available
+        if (account.authMethod === 'browser_session') {
+          const hasSession = await playwrightAutomation.hasSession(account.userId, platform);
+          if (hasSession) {
+            try {
+              const result = await this.postWithPlaywright(post, account);
+              if (result.success && result.postId) {
+                postId = result.postId;
+              } else {
+                throw new Error(result.error || 'Playwright posting failed');
+              }
+            } catch (error) {
+              console.log(`Playwright method failed for ${platform}, trying OAuth...`);
+              authError = error as Error;
+            }
+          }
+        }
+        
+        // If Playwright failed or not available, try cookie-based authentication
+        if (!postId && account.authMethod === 'cookies' && account.cookies) {
+          try {
+            postId = await this.postWithCookies(post, account);
+          } catch (error) {
+            console.log(`Cookie method failed for ${platform}, trying OAuth...`);
+            authError = error as Error;
+          }
+        }
+        
+        // If other methods failed, use traditional OAuth/API methods
+        if (!postId) {
           switch (platform) {
             case 'twitter':
               postId = await this.postToTwitter(post, account);
@@ -322,6 +349,10 @@ export class SocialMediaService {
             default:
               throw new Error(`Unsupported platform: ${platform}`);
           }
+        }
+        
+        if (!postId) {
+          throw new Error(`Failed to get post ID for ${platform} after trying all authentication methods`);
         }
         
         results[platform] = postId;
@@ -447,6 +478,48 @@ export class SocialMediaService {
       };
     } catch (error) {
       return null;
+    }
+  }
+
+  /**
+   * Post using Playwright browser automation
+   */
+  async postWithPlaywright(post: Post, account: SocialAccount): Promise<{ success: boolean; postId?: string; error?: string }> {
+    try {
+      switch (account.platform) {
+        case 'linkedin':
+          return await playwrightAutomation.postToLinkedIn(account.userId, post.content);
+        case 'twitter':
+          return await playwrightAutomation.postToTwitter(account.userId, post.content);
+        case 'facebook':
+          return await playwrightAutomation.postToFacebook(account.userId, post.content);
+        default:
+          return { success: false, error: `Platform ${account.platform} not supported for Playwright automation` };
+      }
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Validate Playwright session for an account
+   */
+  async validatePlaywrightSession(account: SocialAccount): Promise<{ isValid: boolean; error?: string }> {
+    try {
+      return await playwrightAutomation.validateSession(account.userId, account.platform);
+    } catch (error: any) {
+      return { isValid: false, error: error.message };
+    }
+  }
+
+  /**
+   * Start Playwright onboarding for an account
+   */
+  async startPlaywrightOnboarding(userId: number, platform: string): Promise<{ success: boolean; message: string }> {
+    try {
+      return await playwrightAutomation.startOnboarding(userId, platform);
+    } catch (error: any) {
+      return { success: false, message: error.message };
     }
   }
 }
