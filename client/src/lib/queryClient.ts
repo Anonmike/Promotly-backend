@@ -16,15 +16,61 @@ export function setSessionIdGetter(sessionIdGetter: () => string | null) {
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    const contentType = res.headers.get('content-type');
+    let errorMessage = res.statusText;
+    
+    try {
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await res.json();
+        errorMessage = errorData.message || JSON.stringify(errorData);
+      } else {
+        const text = await res.text();
+        // Check if response is HTML (indicating routing issue)
+        if (text.startsWith('<!DOCTYPE') || text.includes('<html')) {
+          console.error('Received HTML instead of JSON - possible routing issue:', text.substring(0, 200));
+          throw new Error(`${res.status}: Server returned HTML instead of JSON. Check API routes.`);
+        }
+        errorMessage = text || res.statusText;
+      }
+    } catch (parseError) {
+      console.error('Error parsing response:', parseError);
+      errorMessage = `${res.status}: Could not parse error response`;
+    }
+    
+    throw new Error(`${res.status}: ${errorMessage}`);
   }
 }
 
 export async function apiRequest(
+  method: string,
   url: string,
-  options: RequestInit = {},
+  body?: any,
+): Promise<Response>;
+export async function apiRequest(
+  url: string,
+  options?: RequestInit,
+): Promise<Response>;
+export async function apiRequest(
+  methodOrUrl: string,
+  urlOrOptions?: string | RequestInit,
+  body?: any,
 ): Promise<Response> {
+  let url: string;
+  let options: RequestInit = {};
+  
+  // Handle both function signatures
+  if (typeof urlOrOptions === 'string') {
+    // First signature: method, url, body
+    options.method = methodOrUrl;
+    url = urlOrOptions;
+    if (body !== undefined) {
+      options.body = typeof body === 'string' ? body : JSON.stringify(body);
+    }
+  } else {
+    // Second signature: url, options
+    url = methodOrUrl;
+    options = urlOrOptions || {};
+  }
   const token = await getClerkToken();
   const sessionId = getSessionId();
   
@@ -32,7 +78,7 @@ export async function apiRequest(
     ...options.headers as Record<string, string>,
   };
   
-  if (options.body && typeof options.body === 'string') {
+  if (options.body && (typeof options.body === 'string' || typeof options.body === 'object')) {
     headers["Content-Type"] = "application/json";
   }
   if (token) {

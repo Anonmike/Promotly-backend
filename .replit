@@ -1,10 +1,10 @@
-modules = ["nodejs-20", "web"]
+modules = ["nodejs-20", "web", "python-3.11"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["chromium"]
+packages = ["cargo", "chromium", "gitFull", "libiconv", "libxcrypt", "openssl", "pkg-config", "playwright-driver", "rustc"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -14,6 +14,10 @@ run = ["npm", "run", "start"]
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
 
 [workflows]
 runButton = "Project"
