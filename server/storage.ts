@@ -1,4 +1,6 @@
 import { users, socialAccounts, posts, analytics, type User, type InsertUser, type SocialAccount, type InsertSocialAccount, type Post, type InsertPost, type Analytics, type InsertAnalytics } from "@shared/schema";
+import { db } from "./db";
+import { eq, and, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -26,6 +28,149 @@ export interface IStorage {
   createAnalytics(analytics: InsertAnalytics): Promise<Analytics>;
   updateAnalytics(id: number, updates: Partial<Analytics>): Promise<Analytics | undefined>;
   getUserAnalytics(userId: number, timeframe?: string): Promise<Analytics[]>;
+}
+
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async getSocialAccounts(userId: number): Promise<SocialAccount[]> {
+    return await db.select().from(socialAccounts).where(eq(socialAccounts.userId, userId));
+  }
+
+  async getSocialAccount(userId: number, platform: string): Promise<SocialAccount | undefined> {
+    const [account] = await db
+      .select()
+      .from(socialAccounts)
+      .where(and(eq(socialAccounts.userId, userId), eq(socialAccounts.platform, platform)));
+    return account || undefined;
+  }
+
+  async createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount> {
+    const [newAccount] = await db
+      .insert(socialAccounts)
+      .values(account)
+      .returning();
+    return newAccount;
+  }
+
+  async updateSocialAccount(id: number, updates: Partial<SocialAccount>): Promise<SocialAccount | undefined> {
+    const [updatedAccount] = await db
+      .update(socialAccounts)
+      .set(updates)
+      .where(eq(socialAccounts.id, id))
+      .returning();
+    return updatedAccount || undefined;
+  }
+
+  async deleteSocialAccount(id: number): Promise<boolean> {
+    const result = await db
+      .delete(socialAccounts)
+      .where(eq(socialAccounts.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getPost(id: number): Promise<Post | undefined> {
+    const [post] = await db.select().from(posts).where(eq(posts.id, id));
+    return post || undefined;
+  }
+
+  async getPosts(userId: number, filters?: { status?: string; platform?: string; limit?: number }): Promise<Post[]> {
+    if (filters?.status && filters?.limit) {
+      return await db.select().from(posts)
+        .where(and(eq(posts.userId, userId), eq(posts.status, filters.status)))
+        .limit(filters.limit);
+    } else if (filters?.status) {
+      return await db.select().from(posts)
+        .where(and(eq(posts.userId, userId), eq(posts.status, filters.status)));
+    } else if (filters?.limit) {
+      return await db.select().from(posts)
+        .where(eq(posts.userId, userId))
+        .limit(filters.limit);
+    } else {
+      return await db.select().from(posts)
+        .where(eq(posts.userId, userId));
+    }
+  }
+
+  async createPost(post: InsertPost): Promise<Post> {
+    const [newPost] = await db
+      .insert(posts)
+      .values(post)
+      .returning();
+    return newPost;
+  }
+
+  async updatePost(id: number, updates: Partial<Post>): Promise<Post | undefined> {
+    const [updatedPost] = await db
+      .update(posts)
+      .set(updates)
+      .where(eq(posts.id, id))
+      .returning();
+    return updatedPost || undefined;
+  }
+
+  async deletePost(id: number): Promise<boolean> {
+    const result = await db
+      .delete(posts)
+      .where(eq(posts.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getScheduledPosts(): Promise<Post[]> {
+    return await db
+      .select()
+      .from(posts)
+      .where(eq(posts.status, "scheduled"));
+  }
+
+  async getAnalytics(postId: number): Promise<Analytics[]> {
+    return await db.select().from(analytics).where(eq(analytics.postId, postId));
+  }
+
+  async createAnalytics(analyticsData: InsertAnalytics): Promise<Analytics> {
+    const [newAnalytics] = await db
+      .insert(analytics)
+      .values(analyticsData)
+      .returning();
+    return newAnalytics;
+  }
+
+  async updateAnalytics(id: number, updates: Partial<Analytics>): Promise<Analytics | undefined> {
+    const [updatedAnalytics] = await db
+      .update(analytics)
+      .set(updates)
+      .where(eq(analytics.id, id))
+      .returning();
+    return updatedAnalytics || undefined;
+  }
+
+  async getUserAnalytics(userId: number, timeframe?: string): Promise<Analytics[]> {
+    const userPosts = await db.select().from(posts).where(eq(posts.userId, userId));
+    const postIds = userPosts.map(post => post.id);
+    
+    if (postIds.length === 0) return [];
+    
+    return await db
+      .select()
+      .from(analytics)
+      .where(inArray(analytics.postId, postIds));
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -233,4 +378,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

@@ -65,6 +65,8 @@ export const insertSocialAccountSchema = createInsertSchema(socialAccounts).pick
   accessToken: true,
   accessTokenSecret: true,
   refreshToken: true,
+  cookies: true,
+  authMethod: true,
   expiresAt: true,
   accountName: true,
 });

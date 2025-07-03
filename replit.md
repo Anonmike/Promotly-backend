@@ -98,6 +98,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **January 03, 2025**: Migrated from in-memory storage to PostgreSQL database
+  - Replaced MemStorage with DatabaseStorage using Drizzle ORM
+  - Created comprehensive database schema for users, social accounts, posts, and analytics
+  - All data is now persisted in PostgreSQL with proper relationships
+  - Database tables created and schema pushed successfully
+  - Application fully functional with persistent data storage
+
 - **June 28, 2025**: Implemented Twitter OAuth authentication system
   - Replaced manual token input with secure OAuth 1.0a flow
   - Added session-based OAuth state management
