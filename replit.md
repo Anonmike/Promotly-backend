@@ -219,6 +219,18 @@ Preferred communication style: Simple, everyday language.
   - Full error handling, session validation, and graceful cleanup of browser processes
   - Ready to replace existing cookie extraction system with more robust automation
 
+- **January 03, 2025**: Successfully integrated Playwright automation into Promotly application
+  - Replaced standalone automation scripts with full Promotly integration
+  - Created PlaywrightAutomationService integrated with existing social media service
+  - Added fallback hierarchy: Browser Sessions → OAuth → Cookies for maximum reliability
+  - Built new API endpoints: /api/browser/onboard, /api/browser/validate, /api/browser/sessions, /api/browser/connect
+  - Updated Social Accounts page with new "Browser Automation" tab as default method
+  - Added real-time session validation and user-friendly setup flow
+  - Implemented graceful error handling for environments without Playwright browsers
+  - Users can now log in once manually and Promotly handles automated posting
+  - Provides most reliable posting method while maintaining backward compatibility
+  - Ready for production deployment once Playwright browsers are installed on server
+
 ## Changelog
 
 - June 27, 2025: Initial setup

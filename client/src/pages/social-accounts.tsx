@@ -19,6 +19,7 @@ interface SocialAccount {
   createdAt: string;
   isConnected?: boolean;
   status?: string;
+  authMethod?: string;
 }
 
 export default function SocialAccounts() {

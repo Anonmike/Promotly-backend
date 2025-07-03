@@ -47,20 +47,27 @@ export class PlaywrightAutomationService {
 
     const userDataDir = path.join(this.sessionsDir, sessionKey);
     
-    // Launch persistent context
-    const context = await chromium.launchPersistentContext(userDataDir, {
-      headless: true,
-      viewport: { width: 1280, height: 720 },
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
-      ]
-    });
+    try {
+      // Launch persistent context
+      const context = await chromium.launchPersistentContext(userDataDir, {
+        headless: true,
+        viewport: { width: 1280, height: 720 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage'
+        ]
+      });
 
-    this.activeSessions.set(sessionKey, context);
-    return context;
+      this.activeSessions.set(sessionKey, context);
+      return context;
+    } catch (error: any) {
+      if (error.message?.includes('Executable doesn\'t exist') || error.message?.includes('playwright install')) {
+        throw new Error('Playwright browsers not installed. Please run: npx playwright install chromium');
+      }
+      throw error;
+    }
   }
 
   /**
@@ -251,6 +258,12 @@ export class PlaywrightAutomationService {
         message: `Browser opened for ${platform} login. Complete login manually, then the session will be saved for automation.`
       };
     } catch (error: any) {
+      if (error.message?.includes('Executable doesn\'t exist') || error.message?.includes('playwright install')) {
+        return { 
+          success: false, 
+          message: 'Playwright browsers not installed. Please run: npx playwright install chromium' 
+        };
+      }
       return { success: false, message: error.message };
     }
   }
