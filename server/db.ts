@@ -38,7 +38,9 @@ const createDatabaseConnection = () => {
       max: 3,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000,
-      application_name: 'promotly-app'
+      application_name: 'promotly-app',
+      // Force IPv4 to avoid IPv6 issues
+      options: '-c default_text_search_config=pg_catalog.english'
     });
 
     pool.on('error', (err) => {

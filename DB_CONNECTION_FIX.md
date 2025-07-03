@@ -1,16 +1,23 @@
 # Database Connection Fix for SASL Authentication Issue
 
 ## Problem
-The application is experiencing a SASL authentication error when connecting to Supabase:
+The application is experiencing a DNS resolution error when connecting to Supabase:
 ```
-SASL: SCRAM-SERVER-FINAL-MESSAGE: server signature is missing
+getaddrinfo ENOTFOUND db.lscynxekmdxaatysdgdn.supabase.co
 ```
 
+## Root Cause Analysis
+DNS testing revealed the issue:
+- ✅ IPv6 DNS lookup works (returns `2600:1f1c:f9:4d08:328d:7565:eab9:8063`)
+- ❌ IPv4 DNS lookup fails with `ENOTFOUND`
+- The hostname `db.lscynxekmdxaatysdgdn.supabase.co` only has IPv6 records
+- PostgreSQL client defaults to IPv4 which fails
+
 ## Cause
-This is a known compatibility issue between:
-- Node.js pg driver versions
-- Supabase's transaction pooler 
-- SCRAM-SHA-256 authentication method
+The connection string hostname appears to be incorrect or incomplete. This could be:
+- Wrong project reference ID in the hostname
+- Incomplete project setup in Supabase
+- Incorrect connection string format copied from dashboard
 
 ## Solution Options
 
