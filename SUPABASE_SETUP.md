@@ -9,12 +9,14 @@
 
 ### 2. Get Database Connection String
 1. In your Supabase project dashboard, click **"Connect"** in the top toolbar
-2. Go to **"Connection string"** → **"Transaction pooler"**
+2. Go to **"Connection string"** → **"Transaction pooler"** (NOT "Direct connection")
 3. Copy the URI value (it looks like this):
    ```
    postgresql://postgres.xxxxx:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres
    ```
 4. Replace `[YOUR-PASSWORD]` with the database password you set when creating the project
+
+**Important:** Make sure you're using the **Transaction pooler** connection string (port 6543), not the Direct connection (port 5432). The pooler is more reliable for applications.
 
 ### 3. Update Replit Environment
 1. In your Replit project, go to **Secrets** (lock icon in sidebar)
