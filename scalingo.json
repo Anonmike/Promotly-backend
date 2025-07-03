@@ -1,0 +1,15 @@
+{
+  "formation": {
+    "web": {
+      "amount": 1,
+      "size": "S"
+    }
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "NPM_CONFIG_PRODUCTION": "false"
+  },
+  "scripts": {
+    "postdeploy": "npm run db:push"
+  }
+}
