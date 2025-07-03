@@ -7,6 +7,13 @@ export function setClerkTokenGetter(tokenGetter: () => Promise<string | null>) {
   getClerkToken = tokenGetter;
 }
 
+// Global session ID getter
+let getSessionId: () => string | null = () => localStorage.getItem('sessionId');
+
+export function setSessionIdGetter(sessionIdGetter: () => string | null) {
+  getSessionId = sessionIdGetter;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -15,26 +22,37 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
   url: string,
-  data?: unknown | undefined,
+  options: RequestInit = {},
 ): Promise<Response> {
   const token = await getClerkToken();
+  const sessionId = getSessionId();
   
-  const headers: Record<string, string> = {};
-  if (data) {
+  const headers: Record<string, string> = {
+    ...options.headers as Record<string, string>,
+  };
+  
+  if (options.body && typeof options.body === 'string') {
     headers["Content-Type"] = "application/json";
   }
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
+  if (sessionId) {
+    headers["X-Session-ID"] = sessionId;
+  }
 
   const res = await fetch(url, {
-    method,
+    ...options,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  // Check for new session ID in response headers
+  const newSessionId = res.headers.get('X-Session-ID');
+  if (newSessionId && newSessionId !== sessionId) {
+    localStorage.setItem('sessionId', newSessionId);
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -46,24 +64,15 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const token = await getClerkToken();
-    
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    try {
+      const res = await apiRequest(queryKey[0] as string, { method: "GET" });
+      return await res.json();
+    } catch (error) {
+      if (unauthorizedBehavior === "returnNull" && error instanceof Error && error.message.includes("401")) {
+        return null;
+      }
+      throw error;
     }
-    
-    const res = await fetch(queryKey[0] as string, {
-      headers,
-      credentials: "include",
-    });
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

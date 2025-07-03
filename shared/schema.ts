@@ -8,6 +8,17 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
+export const userSessions = pgTable("user_sessions", {
+  id: serial("id").primaryKey(),
+  sessionId: text("session_id").notNull().unique(),
+  userId: integer("user_id").notNull(),
+  clerkUserId: text("clerk_user_id").notNull(),
+  data: json("data").$type<Record<string, any>>().default({}),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const socialAccounts = pgTable("social_accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -58,6 +69,14 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
+export const insertUserSessionSchema = createInsertSchema(userSessions).pick({
+  sessionId: true,
+  userId: true,
+  clerkUserId: true,
+  data: true,
+  expiresAt: true,
+});
+
 export const insertSocialAccountSchema = createInsertSchema(socialAccounts).pick({
   userId: true,
   platform: true,
@@ -98,6 +117,9 @@ export const insertAnalyticsSchema = createInsertSchema(analytics).pick({
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+export type UserSession = typeof userSessions.$inferSelect;
 
 export type InsertSocialAccount = z.infer<typeof insertSocialAccountSchema>;
 export type SocialAccount = typeof socialAccounts.$inferSelect;

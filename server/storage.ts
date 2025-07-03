@@ -1,12 +1,20 @@
-import { users, socialAccounts, posts, analytics, type User, type InsertUser, type SocialAccount, type InsertSocialAccount, type Post, type InsertPost, type Analytics, type InsertAnalytics } from "@shared/schema";
+import { users, userSessions, socialAccounts, posts, analytics, type User, type InsertUser, type UserSession, type InsertUserSession, type SocialAccount, type InsertSocialAccount, type Post, type InsertPost, type Analytics, type InsertAnalytics } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+
+  // Session operations
+  createSession(session: InsertUserSession): Promise<UserSession>;
+  getSession(sessionId: string): Promise<UserSession | undefined>;
+  updateSession(sessionId: string, updates: Partial<UserSession>): Promise<UserSession | undefined>;
+  deleteSession(sessionId: string): Promise<boolean>;
+  deleteExpiredSessions(): Promise<number>;
+  getUserSessions(userId: number): Promise<UserSession[]>;
 
   // Social account operations
   getSocialAccounts(userId: number): Promise<SocialAccount[]>;
@@ -47,6 +55,53 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  // Session management
+  async createSession(session: InsertUserSession): Promise<UserSession> {
+    const [newSession] = await db
+      .insert(userSessions)
+      .values(session)
+      .returning();
+    return newSession;
+  }
+
+  async getSession(sessionId: string): Promise<UserSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(userSessions)
+      .where(eq(userSessions.sessionId, sessionId));
+    return session || undefined;
+  }
+
+  async updateSession(sessionId: string, updates: Partial<UserSession>): Promise<UserSession | undefined> {
+    const [updatedSession] = await db
+      .update(userSessions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(userSessions.sessionId, sessionId))
+      .returning();
+    return updatedSession || undefined;
+  }
+
+  async deleteSession(sessionId: string): Promise<boolean> {
+    const result = await db
+      .delete(userSessions)
+      .where(eq(userSessions.sessionId, sessionId));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deleteExpiredSessions(): Promise<number> {
+    const result = await db
+      .delete(userSessions)
+      .where(lt(userSessions.expiresAt, new Date()));
+    return result.rowCount || 0;
+  }
+
+  async getUserSessions(userId: number): Promise<UserSession[]> {
+    return await db
+      .select()
+      .from(userSessions)
+      .where(eq(userSessions.userId, userId));
   }
 
   async getSocialAccounts(userId: number): Promise<SocialAccount[]> {
@@ -175,20 +230,24 @@ export class DatabaseStorage implements IStorage {
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
+  private userSessions: Map<string, UserSession>;
   private socialAccounts: Map<number, SocialAccount>;
   private posts: Map<number, Post>;
   private analytics: Map<number, Analytics>;
   private currentUserId: number;
+  private currentSessionId: number;
   private currentSocialAccountId: number;
   private currentPostId: number;
   private currentAnalyticsId: number;
 
   constructor() {
     this.users = new Map();
+    this.userSessions = new Map();
     this.socialAccounts = new Map();
     this.posts = new Map();
     this.analytics = new Map();
     this.currentUserId = 1;
+    this.currentSessionId = 1;
     this.currentSocialAccountId = 1;
     this.currentPostId = 1;
     this.currentAnalyticsId = 1;
@@ -208,6 +267,58 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  // Session management
+  async createSession(insertSession: InsertUserSession): Promise<UserSession> {
+    const id = this.currentSessionId++;
+    const session: UserSession = {
+      id,
+      sessionId: insertSession.sessionId,
+      userId: insertSession.userId,
+      clerkUserId: insertSession.clerkUserId,
+      data: insertSession.data || {},
+      expiresAt: insertSession.expiresAt,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.userSessions.set(insertSession.sessionId, session);
+    return session;
+  }
+
+  async getSession(sessionId: string): Promise<UserSession | undefined> {
+    return this.userSessions.get(sessionId);
+  }
+
+  async updateSession(sessionId: string, updates: Partial<UserSession>): Promise<UserSession | undefined> {
+    const session = this.userSessions.get(sessionId);
+    if (!session) return undefined;
+
+    const updatedSession = { ...session, ...updates, updatedAt: new Date() };
+    this.userSessions.set(sessionId, updatedSession);
+    return updatedSession;
+  }
+
+  async deleteSession(sessionId: string): Promise<boolean> {
+    return this.userSessions.delete(sessionId);
+  }
+
+  async deleteExpiredSessions(): Promise<number> {
+    const now = new Date();
+    let deletedCount = 0;
+    
+    for (const [sessionId, session] of this.userSessions.entries()) {
+      if (session.expiresAt < now) {
+        this.userSessions.delete(sessionId);
+        deletedCount++;
+      }
+    }
+    
+    return deletedCount;
+  }
+
+  async getUserSessions(userId: number): Promise<UserSession[]> {
+    return Array.from(this.userSessions.values()).filter(session => session.userId === userId);
   }
 
   // Social account operations

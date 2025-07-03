@@ -10,29 +10,37 @@ import { socialMediaService } from "./services/social-media";
 import { scheduler } from "./services/scheduler";
 import { cookieExtractor } from "./services/cookie-extractor";
 import { browserSessionService } from "./services/browser-session";
+import { sessionManager } from "./services/session-manager";
 
 const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
 
-// Middleware to verify Clerk token
+// Middleware to verify Clerk token and manage persistent sessions
 const authenticateClerkToken = async (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
+  const sessionId = req.headers['x-session-id'] as string;
 
   if (!token) {
     return res.status(401).json({ message: 'Access token required' });
   }
 
   try {
+    // Verify Clerk token
     const payload = await verifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY
     });
     
-    // Get or create user in our system
     const clerkUser = await clerkClient.users.getUser(payload.sub);
     
     try {
+      // Check if we have an existing persistent session
+      let persistentSession = null;
+      if (sessionId && sessionManager.isValidSessionId(sessionId)) {
+        persistentSession = await sessionManager.getValidSession(sessionId);
+      }
+
       let user = await storage.getUserByUsername(clerkUser.id);
       
       if (!user) {
@@ -42,8 +50,39 @@ const authenticateClerkToken = async (req: any, res: any, next: any) => {
           password: 'clerk_user' // Placeholder since Clerk handles auth
         });
       }
+
+      // Create or extend persistent session
+      if (!persistentSession) {
+        persistentSession = await sessionManager.createSession(
+          user.id, 
+          clerkUser.id,
+          { 
+            lastActiveAt: new Date(),
+            userAgent: req.headers['user-agent'],
+            ip: req.ip || req.connection.remoteAddress
+          }
+        );
+        // Send session ID back to client
+        res.setHeader('X-Session-ID', persistentSession.sessionId);
+      } else {
+        // Extend existing session and update activity
+        await sessionManager.updateSession(persistentSession.sessionId, {
+          data: {
+            ...persistentSession.data,
+            lastActiveAt: new Date(),
+            userAgent: req.headers['user-agent'],
+            ip: req.ip || req.connection.remoteAddress
+          }
+        });
+        await sessionManager.extendSession(persistentSession.sessionId);
+      }
       
-      req.user = { userId: user.id, username: user.username, clerkId: clerkUser.id };
+      req.user = { 
+        userId: user.id, 
+        username: user.username, 
+        clerkId: clerkUser.id,
+        sessionId: persistentSession.sessionId
+      };
     } catch (dbError) {
       // Handle database connection issues gracefully
       console.error('Database error in auth middleware:', dbError);
@@ -704,6 +743,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avgEngagementRate: 0
       };
       res.json({ summary: emptySummary, analytics: [] });
+    }
+  });
+
+  // Session management endpoints
+  app.get("/api/auth/sessions", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const sessions = await sessionManager.getUserSessions(req.user.userId);
+      
+      // Format sessions for client (remove sensitive data)
+      const sanitizedSessions = sessions.map(session => ({
+        id: session.id,
+        sessionId: session.sessionId,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        lastActiveAt: session.data?.lastActiveAt,
+        userAgent: session.data?.userAgent,
+        isCurrent: session.sessionId === req.user.sessionId
+      }));
+      
+      res.json({ sessions: sanitizedSessions });
+    } catch (error) {
+      console.error('Error fetching user sessions:', error);
+      res.status(500).json({ message: "Failed to fetch sessions" });
+    }
+  });
+
+  app.delete("/api/auth/sessions/:sessionId", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { sessionId } = req.params;
+      
+      // Verify session belongs to the user
+      const session = await sessionManager.getValidSession(sessionId);
+      if (!session || session.userId !== req.user.userId) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      const deleted = await sessionManager.deleteSession(sessionId);
+      if (deleted) {
+        res.json({ message: "Session deleted successfully" });
+      } else {
+        res.status(404).json({ message: "Session not found" });
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      res.status(500).json({ message: "Failed to delete session" });
+    }
+  });
+
+  app.delete("/api/auth/sessions", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const deletedCount = await sessionManager.deleteUserSessions(req.user.userId);
+      res.json({ 
+        message: `Deleted ${deletedCount} sessions`,
+        deletedCount 
+      });
+    } catch (error) {
+      console.error('Error deleting user sessions:', error);
+      res.status(500).json({ message: "Failed to delete sessions" });
     }
   });
 
