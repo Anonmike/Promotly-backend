@@ -28,7 +28,7 @@ export const socialAccounts = pgTable("social_accounts", {
   accessTokenSecret: text("access_token_secret"), // For OAuth 1.0a (Twitter)
   refreshToken: text("refresh_token"),
   cookies: text("cookies"), // JSON string of cookies for headless automation
-  authMethod: text("auth_method").default("oauth"), // oauth, cookies, or browser_session
+  authMethod: text("auth_method").default("oauth"), // oauth or cookies
   expiresAt: timestamp("expires_at"),
   accountName: text("account_name").notNull(),
   isActive: boolean("is_active").default(true),

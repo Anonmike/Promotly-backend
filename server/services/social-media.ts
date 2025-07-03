@@ -2,7 +2,6 @@ import { TwitterApi } from "twitter-api-v2";
 import axios from "axios";
 import type { Post, SocialAccount } from "@shared/schema";
 import { browserAutomationService, type CookieData } from "./browser-automation";
-import { browserSessionClient } from "./browser-session-client";
 
 export class SocialMediaService {
   private twitterClients: Map<string, TwitterApi> = new Map();
@@ -23,94 +22,114 @@ export class SocialMediaService {
         throw new Error('Tweet content exceeds 280 character limit');
       }
 
-      const result = await client.v2.tweet(post.content);
-      return result.data.id;
+      let tweetData: any = {
+        text: post.content
+      };
+
+      // Add media if present
+      if (post.mediaUrls && post.mediaUrls.length > 0) {
+        const mediaIds = await this.uploadMediaToTwitter(client, post.mediaUrls);
+        if (mediaIds.length > 0) {
+          tweetData.media = { media_ids: mediaIds };
+        }
+      }
+
+      const tweet = await client.v2.tweet(tweetData);
+      return tweet.data.id;
     } catch (error: any) {
       console.error('Twitter posting error:', error);
       
       // Handle specific Twitter API errors
       if (error.code === 401 || error.code === 403) {
+        // Clear cached client for this account
+        const key = `${account.userId}_${account.platform}`;
+        this.twitterClients.delete(key);
         throw new Error('Twitter account disconnected. Please reconnect your Twitter account.');
-      } else if (error.code === 429) {
-        throw new Error('Rate limit exceeded. Please try again later.');
-      } else if (error.message?.includes('duplicate')) {
-        throw new Error('Duplicate content detected. Please modify your post.');
       }
       
-      throw new Error(`Twitter posting failed: ${error.message || 'Unknown error'}`);
+      if (error.message?.includes('duplicate')) {
+        throw new Error('This tweet appears to be a duplicate of a recent post.');
+      }
+      
+      if (error.code === 429) {
+        throw new Error('Twitter rate limit reached. Please try again later.');
+      }
+      
+      throw new Error(`Twitter posting failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   // Facebook Integration
   async postToFacebook(post: Post, account: SocialAccount): Promise<string> {
     try {
-      if (!account.accessToken) {
-        throw new Error('No Facebook access token available');
+      const pageId = account.accountId;
+      const accessToken = account.accessToken;
+
+      const postData: any = {
+        message: post.content,
+        access_token: accessToken
+      };
+
+      // Add media if present
+      if (post.mediaUrls && post.mediaUrls.length > 0) {
+        // For simplicity, using the first image
+        postData.link = post.mediaUrls[0];
       }
 
       const response = await axios.post(
-        `https://graph.facebook.com/me/feed`,
-        {
-          message: post.content,
-          access_token: account.accessToken
-        }
+        `https://graph.facebook.com/v18.0/${pageId}/feed`,
+        postData
       );
 
       return response.data.id;
-    } catch (error: any) {
-      console.error('Facebook posting error:', error);
-      
-      if (error.response?.status === 401) {
-        throw new Error('Facebook account disconnected. Please reconnect your Facebook account.');
-      }
-      
-      throw new Error(`Facebook posting failed: ${error.response?.data?.error?.message || error.message || 'Unknown error'}`);
+    } catch (error) {
+      throw new Error(`Facebook posting failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   // LinkedIn Integration
   async postToLinkedIn(post: Post, account: SocialAccount): Promise<string> {
     try {
-      if (!account.accessToken) {
-        throw new Error('No LinkedIn access token available');
-      }
+      const personUrn = `urn:li:person:${account.accountId}`;
+      const accessToken = account.accessToken;
 
-      // Get user ID first
-      const profileResponse = await axios.get(
-        'https://api.linkedin.com/v2/people/~',
-        {
-          headers: {
-            'Authorization': `Bearer ${account.accessToken}`,
-            'X-Restli-Protocol-Version': '2.0.0'
-          }
-        }
-      );
-
-      const userId = profileResponse.data.id;
-
-      // Create the post
       const postData = {
-        author: `urn:li:person:${userId}`,
-        lifecycleState: 'PUBLISHED',
+        author: personUrn,
+        lifecycleState: "PUBLISHED",
         specificContent: {
-          'com.linkedin.ugc.ShareContent': {
+          "com.linkedin.ugc.ShareContent": {
             shareCommentary: {
               text: post.content
             },
-            shareMediaCategory: 'NONE'
+            shareMediaCategory: post.mediaUrls && post.mediaUrls.length > 0 ? "IMAGE" : "NONE"
           }
         },
         visibility: {
-          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+          "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
         }
       };
+
+      // Add media if present
+      if (post.mediaUrls && post.mediaUrls.length > 0) {
+        const mediaUrn = await this.uploadMediaToLinkedIn(post.mediaUrls[0], accessToken);
+        postData.specificContent["com.linkedin.ugc.ShareContent"].media = [{
+          status: "READY",
+          description: {
+            text: "Shared image"
+          },
+          media: mediaUrn,
+          title: {
+            text: "Image"
+          }
+        }];
+      }
 
       const response = await axios.post(
         'https://api.linkedin.com/v2/ugcPosts',
         postData,
         {
           headers: {
-            'Authorization': `Bearer ${account.accessToken}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
             'X-Restli-Protocol-Version': '2.0.0'
           }
@@ -118,53 +137,42 @@ export class SocialMediaService {
       );
 
       return response.data.id;
-    } catch (error: any) {
-      console.error('LinkedIn posting error:', error);
-      
-      if (error.response?.status === 401) {
-        throw new Error('LinkedIn account disconnected. Please reconnect your LinkedIn account.');
-      }
-      
-      throw new Error(`LinkedIn posting failed: ${error.response?.data?.message || error.message || 'Unknown error'}`);
+    } catch (error) {
+      throw new Error(`LinkedIn posting failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  // Instagram Integration (placeholder)
+  // Instagram Basic Display (read-only, but included for completeness)
   async postToInstagram(post: Post, account: SocialAccount): Promise<string> {
-    throw new Error('Instagram posting not yet implemented');
+    // Note: Instagram Basic Display API is read-only
+    // For posting, you'd need Instagram Graph API with a Facebook Business account
+    throw new Error("Instagram posting requires Instagram Graph API with Business account");
   }
 
+  // Helper methods
   private getTwitterClient(account: SocialAccount): TwitterApi {
     const key = `${account.userId}_${account.platform}`;
     
     if (!this.twitterClients.has(key)) {
-      if (!account.accessToken || !account.accessTokenSecret) {
-        throw new Error('Twitter tokens not available');
-      }
-
       const client = new TwitterApi({
         appKey: process.env.TWITTER_CONSUMER_KEY!,
         appSecret: process.env.TWITTER_CONSUMER_SECRET!,
         accessToken: account.accessToken,
-        accessSecret: account.accessTokenSecret,
+        accessSecret: account.accessTokenSecret!,
       });
-
+      
       this.twitterClients.set(key, client);
     }
 
     return this.twitterClients.get(key)!;
   }
 
-  // Twitter token validation
+  // Validate Twitter token by making a simple API call
   async validateTwitterToken(account: SocialAccount): Promise<boolean> {
     try {
-      if (!account.accessToken || !account.accessTokenSecret) {
-        return false;
-      }
-
       const client = this.getTwitterClient(account);
       
-      // Simple API call to verify credentials
+      // Try to get user info to validate token
       await client.v2.me();
       return true;
     } catch (error: any) {
@@ -212,8 +220,11 @@ export class SocialMediaService {
         oauthTokenSecret: authLink.oauth_token_secret,
       };
     } catch (error) {
-      console.error('Twitter OAuth initialization failed:', error);
-      throw new Error('Failed to initialize Twitter authentication');
+      console.error('Twitter OAuth initialization error:', error);
+      if (error instanceof Error && error.message.includes('403')) {
+        throw new Error('Twitter app configuration error: Please add the callback URL to your Twitter app settings in the Developer Portal');
+      }
+      throw new Error(`Failed to initialize Twitter OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -230,20 +241,49 @@ export class SocialMediaService {
         accessSecret: oauthTokenSecret,
       });
 
-      const { client: loggedClient, accessToken, accessSecret } = await client.login(oauthVerifier);
-      
-      // Get user info
-      const user = await loggedClient.v2.me();
+      const loginResult = await client.login(oauthVerifier);
       
       return {
-        accessToken,
-        accessTokenSecret: accessSecret,
-        userId: user.data.id,
-        screenName: user.data.username,
+        accessToken: loginResult.accessToken,
+        accessTokenSecret: loginResult.accessSecret,
+        userId: loginResult.userId,
+        screenName: loginResult.screenName,
       };
     } catch (error) {
-      console.error('Twitter OAuth completion failed:', error);
-      throw new Error('Failed to complete Twitter authentication');
+      console.error('Twitter OAuth completion error:', error);
+      throw new Error(`Failed to complete Twitter OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private async uploadMediaToTwitter(client: TwitterApi, mediaUrls: string[]): Promise<string[]> {
+    const mediaIds: string[] = [];
+    
+    for (const url of mediaUrls.slice(0, 4)) { // Twitter allows max 4 images
+      try {
+        // Download image
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data);
+        
+        // Upload to Twitter
+        const mediaId = await client.v1.uploadMedia(buffer, { mimeType: response.headers['content-type'] });
+        mediaIds.push(mediaId);
+      } catch (error) {
+        console.error(`Failed to upload media ${url}:`, error);
+      }
+    }
+    
+    return mediaIds;
+  }
+
+  private async uploadMediaToLinkedIn(mediaUrl: string, accessToken: string): Promise<string> {
+    try {
+      // This is a simplified version - LinkedIn media upload is more complex
+      // First, you need to register the upload, then upload the binary, then reference it
+      
+      // For now, return a placeholder URN
+      return `urn:li:digitalmediaAsset:${Date.now()}`;
+    } catch (error) {
+      throw new Error(`LinkedIn media upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -261,11 +301,8 @@ export class SocialMediaService {
       try {
         let postId: string;
         
-        // Try browser session authentication if set as primary method
-        if (account.authMethod === 'browser_session') {
-          postId = await this.postWithBrowserSession(post, account);
-        } else if (account.authMethod === 'cookies' && account.cookies) {
-          // Try cookie-based authentication if set as primary method
+        // Try cookie-based authentication if set as primary method
+        if (account.authMethod === 'cookies' && account.cookies) {
           postId = await this.postWithCookies(post, account);
         } else {
           // Use traditional OAuth/API methods
@@ -291,19 +328,19 @@ export class SocialMediaService {
       } catch (error) {
         console.error(`Failed to post to ${platform}:`, error);
         
-        // Fallback to browser session if other methods fail
-        if (account.authMethod !== 'browser_session') {
+        // If OAuth fails and we have cookies, try fallback
+        if (account.authMethod !== 'cookies' && account.cookies) {
           try {
-            console.log(`Trying browser session fallback for ${platform}...`);
-            const fallbackPostId = await this.postWithBrowserSession(post, account);
-            results[platform] = fallbackPostId;
-            console.log(`Browser session fallback succeeded for ${platform}`);
-          } catch (fallbackError) {
-            console.error(`Browser session fallback also failed for ${platform}:`, fallbackError);
-            throw error; // Re-throw original error
+            console.log(`Attempting cookie fallback for ${platform}`);
+            const postId = await this.postWithCookies(post, account);
+            results[platform] = postId;
+            console.log(`Cookie fallback successful for ${platform}`);
+          } catch (cookieError) {
+            console.error(`Cookie fallback also failed for ${platform}:`, cookieError);
+            throw error; // Throw original error
           }
         } else {
-          throw error; // Re-throw if browser session was already the primary method
+          throw error; // Re-throw to handle at caller level
         }
       }
     }
@@ -321,11 +358,11 @@ export class SocialMediaService {
     
     switch (account.platform) {
       case "twitter":
-        return await browserAutomationService.postToTwitter(post.content, cookies);
+        return await browserAutomationService.postToTwitterWithCookies(post, cookies);
       case "facebook":
-        return await browserAutomationService.postToFacebook(post.content, cookies);
+        return await browserAutomationService.postToFacebookWithCookies(post, cookies);
       case "linkedin":
-        return await browserAutomationService.postToLinkedIn(post.content, cookies);
+        return await browserAutomationService.postToLinkedInWithCookies(post, cookies);
       default:
         throw new Error(`Cookie-based posting not supported for platform: ${account.platform}`);
     }
@@ -334,127 +371,6 @@ export class SocialMediaService {
   // Validate cookies for a platform
   async validateCookies(platform: string, cookies: CookieData[]): Promise<boolean> {
     return await browserAutomationService.validateCookies(platform, cookies);
-  }
-
-  // Browser Session Integration Methods
-  async initializeBrowserSession(userId: number, platform: string): Promise<{ sessionUrl: string; sessionId: string; instructions: string[] }> {
-    try {
-      // Check if browser session service is available
-      await browserSessionClient.healthCheck();
-      
-      const loginUrls = {
-        twitter: 'https://twitter.com/login',
-        linkedin: 'https://www.linkedin.com/login',
-        facebook: 'https://www.facebook.com/login'
-      };
-
-      const loginUrl = loginUrls[platform as keyof typeof loginUrls];
-      if (!loginUrl) {
-        throw new Error(`Unsupported platform for browser sessions: ${platform}`);
-      }
-
-      const result = await browserSessionClient.createSession(
-        userId.toString(),
-        platform,
-        loginUrl
-      );
-
-      return {
-        sessionUrl: result.next_step,
-        sessionId: `${userId}:${platform}`,
-        instructions: [
-          `Browser opened for ${platform} login`,
-          'Complete the login process manually in the opened browser',
-          'Once logged in, confirm completion to save your session',
-          'This session will be used for automated posting'
-        ]
-      };
-    } catch (error) {
-      console.error('Failed to initialize browser session:', error);
-      throw new Error(`Browser session initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  async confirmBrowserSession(userId: number, platform: string): Promise<{ success: boolean; message: string }> {
-    try {
-      const result = await browserSessionClient.confirmLogin(
-        userId.toString(),
-        platform
-      );
-
-      return {
-        success: result.session_saved || false,
-        message: result.message || 'Session confirmed successfully'
-      };
-    } catch (error) {
-      console.error('Failed to confirm browser session:', error);
-      throw new Error(`Browser session confirmation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  async postWithBrowserSession(post: Post, account: SocialAccount): Promise<string> {
-    try {
-      const platform = account.platform;
-      const userId = account.userId.toString();
-
-      // Validate session before posting
-      const isValidSession = await browserSessionClient.validateSession(userId, platform);
-      if (!isValidSession) {
-        throw new Error(`${platform} browser session expired. Please reconnect your account.`);
-      }
-
-      let result;
-      switch (platform) {
-        case 'twitter':
-          result = await browserSessionClient.postToTwitter(userId, post.content, post.mediaUrls || []);
-          break;
-        case 'linkedin':
-          result = await browserSessionClient.postToLinkedIn(userId, post.content, post.mediaUrls || []);
-          break;
-        case 'facebook':
-          result = await browserSessionClient.postToFacebook(userId, post.content, post.mediaUrls || []);
-          break;
-        default:
-          throw new Error(`Browser session posting not supported for ${platform}`);
-      }
-
-      if (result.status === 'action_completed') {
-        return result.result.post_id || `browser_session_${Date.now()}`;
-      } else {
-        throw new Error(result.message || 'Posting failed');
-      }
-    } catch (error) {
-      console.error(`Browser session posting failed for ${account.platform}:`, error);
-      throw error;
-    }
-  }
-
-  async validateBrowserSession(userId: number, platform: string): Promise<boolean> {
-    try {
-      return await browserSessionClient.validateSession(userId.toString(), platform);
-    } catch (error) {
-      console.error('Browser session validation failed:', error);
-      return false;
-    }
-  }
-
-  async listBrowserSessions(userId: number): Promise<any[]> {
-    try {
-      return await browserSessionClient.listSessions(userId.toString());
-    } catch (error) {
-      console.error('Failed to list browser sessions:', error);
-      return [];
-    }
-  }
-
-  async deleteBrowserSession(userId: number, platform: string): Promise<boolean> {
-    try {
-      await browserSessionClient.deleteSession(userId.toString(), platform);
-      return true;
-    } catch (error) {
-      console.error('Failed to delete browser session:', error);
-      return false;
-    }
   }
 
   // Method to fetch analytics for published posts

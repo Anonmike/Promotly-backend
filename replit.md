@@ -206,16 +206,6 @@ Preferred communication style: Simple, everyday language.
   - Enhanced UI with step-by-step instructions and completion dialogs
   - Provides most user-friendly method for social media account authentication
 
-- **January 03, 2025**: Integrated Python browser session service for persistent authentication
-  - Replaced cookie-based authentication with comprehensive Python Playwright service
-  - Built FastAPI service with encrypted browser session management using Fernet encryption
-  - Created Node.js client for seamless integration with Promotly backend
-  - Added dedicated "Browser Session" tab in social accounts page with user-friendly workflow
-  - Implemented automatic fallback from OAuth/cookies to browser sessions when posting fails
-  - Enhanced security with isolated browser profiles and 7-day session expiration
-  - Added session validation, management, and cleanup functionality
-  - Provides most reliable and secure method for social media automation
-
 ## Changelog
 
 - June 27, 2025: Initial setup
