@@ -8,15 +8,26 @@
 3. Wait for the project to finish setting up (2-3 minutes)
 
 ### 2. Get Database Connection String
+
+**For Direct Connection (Recommended to fix SASL issues):**
 1. In your Supabase project dashboard, click **"Connect"** in the top toolbar
-2. Go to **"Connection string"** → **"Transaction pooler"** (NOT "Direct connection")
-3. Copy the URI value (it looks like this):
+2. Go to **"Connection string"** → **"Direct connection"**
+3. Copy the URI value (it should look like this):
    ```
-   postgresql://postgres.xxxxx:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres
+   postgresql://postgres:[YOUR-PASSWORD]@db.xxxxxxxxxxxxx.supabase.co:5432/postgres
    ```
 4. Replace `[YOUR-PASSWORD]` with the database password you set when creating the project
 
-**Important:** Make sure you're using the **Transaction pooler** connection string (port 6543), not the Direct connection (port 5432). The pooler is more reliable for applications.
+**Alternative - Transaction Pooler:**
+If direct connection doesn't work, try the pooler:
+1. Go to **"Connection string"** → **"Transaction pooler"**
+2. Copy the URI (format: `postgresql://postgres.xxxxx:[password]@aws-0-us-west-1.pooler.supabase.com:6543/postgres`)
+
+**Connection String Troubleshooting:**
+- Direct connection uses port `5432` and hostname like `db.xxxxx.supabase.co`
+- Transaction pooler uses port `6543` and hostname like `aws-0-region.pooler.supabase.com`
+- Make sure the hostname resolves properly
+- Verify your project ID is correct in the connection string
 
 ### 3. Update Replit Environment
 1. In your Replit project, go to **Secrets** (lock icon in sidebar)
