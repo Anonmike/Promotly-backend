@@ -486,6 +486,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Browser session routes (new persistent session system)
+  app.post("/api/social-accounts/browser-session/start", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { platform } = req.body;
+      
+      if (!platform) {
+        return res.status(400).json({ message: "Platform is required" });
+      }
+
+      if (!['twitter', 'facebook', 'linkedin'].includes(platform)) {
+        return res.status(400).json({ message: "Unsupported platform" });
+      }
+
+      const result = await socialMediaService.initializeBrowserSession(req.user.userId, platform);
+      
+      res.json({
+        success: true,
+        sessionId: result.sessionId,
+        instructions: result.instructions,
+        message: `Browser session created for ${platform}. Complete login in the opened browser.`,
+        next_action: 'confirm'
+      });
+    } catch (error) {
+      console.error('Browser session start error:', error);
+      res.status(500).json({ 
+        message: "Failed to start browser session",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post("/api/social-accounts/browser-session/confirm", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { platform, accountName } = req.body;
+      
+      if (!platform || !accountName) {
+        return res.status(400).json({ message: "Platform and account name are required" });
+      }
+
+      const confirmResult = await socialMediaService.confirmBrowserSession(req.user.userId, platform);
+      
+      if (confirmResult.success) {
+        // Create social account record with browser session authentication
+        const account = await storage.createSocialAccount({
+          userId: req.user.userId,
+          platform,
+          accountId: `browser_${req.user.userId}_${platform}`,
+          accountName,
+          accessToken: null,
+          accessTokenSecret: null,
+          refreshToken: null,
+          cookies: null,
+          authMethod: 'browser_session',
+          expiresAt: null
+        });
+
+        res.json({
+          success: true,
+          message: confirmResult.message,
+          account: {
+            ...account,
+            isConnected: true,
+            status: 'connected',
+            authMethod: 'browser_session'
+          }
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: confirmResult.message
+        });
+      }
+    } catch (error) {
+      console.error('Browser session confirm error:', error);
+      res.status(500).json({ 
+        message: "Failed to confirm browser session",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get("/api/social-accounts/browser-sessions", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const sessions = await socialMediaService.listBrowserSessions(req.user.userId);
+      res.json({ sessions });
+    } catch (error) {
+      console.error('List browser sessions error:', error);
+      res.status(500).json({ 
+        message: "Failed to list browser sessions",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.delete("/api/social-accounts/browser-session/:platform", authenticateClerkToken, async (req: any, res) => {
+    try {
+      const { platform } = req.params;
+      
+      const deleted = await socialMediaService.deleteBrowserSession(req.user.userId, platform);
+      
+      if (deleted) {
+        res.json({ message: `Browser session deleted for ${platform}` });
+      } else {
+        res.status(404).json({ message: "Browser session not found" });
+      }
+    } catch (error) {
+      console.error('Delete browser session error:', error);
+      res.status(500).json({ 
+        message: "Failed to delete browser session",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Automatic cookie extraction routes
   app.post("/api/social-accounts/extract-cookies/start", authenticateClerkToken, async (req: any, res) => {
     try {

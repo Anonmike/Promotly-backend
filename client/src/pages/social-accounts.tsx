@@ -40,6 +40,14 @@ export default function SocialAccounts() {
     loginUrl: '',
     extractedCookies: ''
   });
+  const [browserSessionState, setBrowserSessionState] = useState({
+    isConnecting: false,
+    platform: '',
+    sessionId: '',
+    showComplete: false,
+    accountName: '',
+    instructions: [] as string[]
+  });
 
   // Check for connection success/error messages in URL
   useEffect(() => {
@@ -264,6 +272,72 @@ export default function SocialAccounts() {
     autoExtractStartMutation.mutate(platform);
   };
 
+  // Browser session mutations
+  const browserSessionStartMutation = useMutation({
+    mutationFn: async (platform: string) => {
+      const response = await apiRequest("POST", "/api/social-accounts/browser-session/start", { platform });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setBrowserSessionState({
+        isConnecting: true,
+        platform: browserSessionState.platform,
+        sessionId: data.sessionId,
+        showComplete: true,
+        accountName: '',
+        instructions: data.instructions || []
+      });
+      toast({
+        title: "Browser Session Started",
+        description: `Please complete login in the opened browser window.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to start browser session",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const browserSessionConfirmMutation = useMutation({
+    mutationFn: async ({ platform, accountName }: { platform: string; accountName: string }) => {
+      const response = await apiRequest("POST", "/api/social-accounts/browser-session/confirm", { 
+        platform, 
+        accountName
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-accounts"] });
+      setBrowserSessionState({
+        isConnecting: false,
+        platform: '',
+        sessionId: '',
+        showComplete: false,
+        accountName: '',
+        instructions: []
+      });
+      toast({
+        title: "Account Connected",
+        description: `${browserSessionState.platform} account connected successfully using browser session.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to confirm browser session",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleBrowserSession = (platform: string) => {
+    setBrowserSessionState(prev => ({ ...prev, platform }));
+    browserSessionStartMutation.mutate(platform);
+  };
+
   const platforms = [
     { id: "twitter", name: "Twitter/X", icon: Twitter, color: "bg-blue-500" },
     { id: "facebook", name: "Facebook", icon: Facebook, color: "bg-blue-600" },
@@ -320,8 +394,9 @@ export default function SocialAccounts() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="oauth" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="oauth">OAuth Authentication</TabsTrigger>
+                <TabsTrigger value="browser-session">Browser Session</TabsTrigger>
                 <TabsTrigger value="auto-cookies">Auto Cookie Extract</TabsTrigger>
                 <TabsTrigger value="cookies">Manual Cookies</TabsTrigger>
               </TabsList>
@@ -474,6 +549,113 @@ export default function SocialAccounts() {
                 </div>
               </div>
               <Badge variant="secondary">Coming Soon</Badge>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="browser-session" className="space-y-4 mt-6">
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">Browser session authentication creates persistent browser sessions for automated posting.</p>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-green-800 font-medium mb-1">🔒 Most Secure Method</p>
+                  <ul className="text-green-700 text-xs space-y-1">
+                    <li>• Uses secure browser automation with encrypted sessions</li>
+                    <li>• Bypasses API rate limits and token expiration issues</li>
+                    <li>• Works with all major platforms consistently</li>
+                    <li>• Sessions persist across application restarts</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Platform Selection for Browser Session */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {platforms.map((platform) => (
+                  <div key={platform.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className={`p-2 rounded-full ${platform.color}`}>
+                        <platform.icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold capitalize">{platform.name}</h3>
+                        <p className="text-xs text-gray-600">Persistent browser session</p>
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={() => handleBrowserSession(platform.id)}
+                      disabled={browserSessionStartMutation.isPending}
+                      className="w-full flex items-center space-x-2"
+                      size="sm"
+                    >
+                      <Globe className="h-4 w-4" />
+                      <span>{browserSessionStartMutation.isPending && browserSessionState.platform === platform.id ? "Starting..." : "Create Session"}</span>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Browser Session Completion Dialog */}
+              {browserSessionState.showComplete && (
+                <Card className="border-green-200 bg-green-50">
+                  <CardHeader>
+                    <CardTitle className="text-green-900">Complete Browser Session Setup</CardTitle>
+                    <CardDescription className="text-green-700">
+                      A browser window has been opened for {browserSessionState.platform} login. Complete the login process and confirm below.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 bg-green-100 rounded-lg">
+                      <h4 className="font-medium text-green-900 mb-2">Instructions:</h4>
+                      <ol className="list-decimal list-inside space-y-1 text-sm text-green-800">
+                        {browserSessionState.instructions.map((instruction, index) => (
+                          <li key={index}>{instruction}</li>
+                        ))}
+                      </ol>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="browser-account-name" className="text-green-900">
+                        Account Name/Username
+                      </Label>
+                      <Input
+                        id="browser-account-name"
+                        value={browserSessionState.accountName}
+                        onChange={(e) => setBrowserSessionState(prev => ({ ...prev, accountName: e.target.value }))}
+                        placeholder="Enter your account username"
+                        className="border-green-300"
+                      />
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={() => browserSessionConfirmMutation.mutate({
+                          platform: browserSessionState.platform,
+                          accountName: browserSessionState.accountName
+                        })}
+                        disabled={!browserSessionState.accountName || browserSessionConfirmMutation.isPending}
+                        className="flex-1"
+                      >
+                        {browserSessionConfirmMutation.isPending ? "Confirming..." : "Confirm & Save Session"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setBrowserSessionState({
+                            isConnecting: false,
+                            platform: '',
+                            sessionId: '',
+                            showComplete: false,
+                            accountName: '',
+                            instructions: []
+                          });
+                        }}
+                        disabled={browserSessionConfirmMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
           
