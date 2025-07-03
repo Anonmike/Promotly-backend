@@ -42,7 +42,13 @@ export class SchedulerService {
         await this.processPost(post);
       }
     } catch (error) {
-      console.error("Error processing scheduled posts:", error);
+      // Handle database connectivity issues gracefully
+      if (error.message && error.message.includes('SASL')) {
+        console.warn("Database connection issue detected, skipping scheduled post processing");
+        return;
+      }
+      
+      console.error("Error processing scheduled posts:", error.message || error);
     }
   }
 
